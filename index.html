@@ -129,7 +129,15 @@
             </div>
             
             <div class="game-screen hidden" id="game-screen">
-                <div id="maze-container"></div>
+                <div id="maze-container">
+                    <div class="controls-hint">Используйте колесо мыши для масштабирования, перетаскивайте для перемещения</div>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" id="zoom-out">-</button>
+                        <button class="zoom-btn" id="zoom-in">+</button>
+                        <button class="zoom-btn" id="zoom-reset">⟲</button>
+                    </div>
+                    <div class="scale-indicator" id="scale-indicator">Масштаб: 100%</div>
+                </div>
                 
                 <div class="race-info">
                     <div class="current-bet">

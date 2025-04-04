@@ -11,11 +11,23 @@ class MazeGenerator {
         
         // Получаем настройки из ASSETS в зависимости от сложности
         const mazeConfig = ASSETS.MAZE[difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
-        this.rows = mazeConfig.ROWS || rows;
-        this.cols = mazeConfig.COLS || cols;
-        this.randomPathsCount = mazeConfig.RANDOM_PATHS || 4;
-        this.trapsCount = mazeConfig.TRAPS || 4;
-        this.boostsCount = mazeConfig.BOOSTS || 3;
+        
+        // Используем переданные размеры, если они есть, иначе берем из конфигурации
+        this.rows = rows || mazeConfig.ROWS;
+        this.cols = cols || mazeConfig.COLS;
+        
+        // Убеждаемся, что размеры не меньше минимальных значений
+        this.rows = Math.max(this.rows, 10);
+        this.cols = Math.max(this.cols, 10);
+        
+        // Настройки для спецэлементов, масштабируем в зависимости от размера
+        const scaleFactor = (this.rows * this.cols) / (mazeConfig.ROWS * mazeConfig.COLS);
+        this.randomPathsCount = Math.round(mazeConfig.RANDOM_PATHS * Math.sqrt(scaleFactor)) || 4;
+        this.trapsCount = Math.round(mazeConfig.TRAPS * Math.sqrt(scaleFactor)) || 4;
+        this.boostsCount = Math.round(mazeConfig.BOOSTS * Math.sqrt(scaleFactor)) || 3;
+        
+        console.log(`Создание лабиринта размером ${this.rows}x${this.cols} (сложность: ${difficulty})`);
+        console.log(`Специальные элементы: ${this.randomPathsCount} доп. путей, ${this.trapsCount} ловушек, ${this.boostsCount} ускорителей`);
         
         this.cellTypes = ASSETS.CELL_TYPES;
     }
@@ -345,13 +357,33 @@ class MazeGenerator {
  * Класс для управления лабиринтом в игре
  */
 class Maze {
-    constructor(difficulty = 'medium') {
-        this.difficulty = difficulty;
+    constructor(gridOrDifficulty, start = null, finish = null) {
+        // Проверяем тип первого аргумента
+        if (Array.isArray(gridOrDifficulty)) {
+            // Если передан готовый массив сетки
+            this.grid = gridOrDifficulty;
+            this.rows = this.grid.length;
+            this.cols = this.grid[0].length;
+            this.start = start;
+            this.finish = finish;
+            this.difficulty = 'medium'; // По умолчанию средняя сложность
+            
+            console.log(`Maze: Инициализация с готовой сеткой ${this.rows}x${this.cols}`);
+        } else {
+            // Если передана сложность
+            this.difficulty = gridOrDifficulty || 'medium';
+            
+            // Получаем настройки из ASSETS
+            const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
+            this.rows = mazeConfig.ROWS;
+            this.cols = mazeConfig.COLS;
+            
+            console.log(`Maze: Генерация лабиринта со сложностью ${this.difficulty} (${this.rows}x${this.cols})`);
+            
+            // Генерируем лабиринт
+            this.generate();
+        }
         
-        // Получаем настройки из ASSETS
-        const mazeConfig = ASSETS.MAZE[difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
-        this.rows = mazeConfig.ROWS;
-        this.cols = mazeConfig.COLS;
         this.cellSize = ASSETS.CELL_SIZE;
         
         // Выбираем случайный стиль для лабиринта
@@ -360,9 +392,6 @@ class Maze {
         
         // Время для эффектов анимации
         this.effectTime = 0;
-        
-        // Генерируем лабиринт
-        this.generate();
     }
     
     /**
@@ -424,7 +453,7 @@ class Maze {
     }
     
     /**
-     * Отрисовка лабиринта на канвасе
+     * Отрисовка лабиринта на canvas
      */
     draw(ctx) {
         // Обновляем время для эффектов
@@ -453,21 +482,21 @@ class Maze {
             case ASSETS.CELL_TYPES.WALL:
                 this.drawWall(ctx, x, y);
                 break;
-                
+            
             case ASSETS.CELL_TYPES.PATH:
                 this.drawPath(ctx, x, y);
                 break;
-                
+            
             case ASSETS.CELL_TYPES.START:
                 this.drawPath(ctx, x, y);
                 this.drawStart(ctx, x, y);
                 break;
-                
+            
             case ASSETS.CELL_TYPES.FINISH:
                 this.drawPath(ctx, x, y);
                 this.drawFinish(ctx, x, y);
                 break;
-                
+            
             case ASSETS.CELL_TYPES.TRAP:
                 this.drawPath(ctx, x, y);
                 this.drawTrap(ctx, x, y);

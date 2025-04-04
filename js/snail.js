@@ -104,7 +104,7 @@ class Snail {
         this.element.style.height = `${elementSize}px`;
         
         // Добавляем плавное перемещение и стили для улучшения внешнего вида
-        this.element.style.transition = 'left 0.3s linear, top 0.3s linear, transform 0.2s ease';
+        this.element.style.transition = 'left 0.5s ease-in-out, top 0.5s ease-in-out, transform 0.3s ease-in-out';
         this.element.style.position = 'absolute';
         this.element.style.borderRadius = '50%';
         this.element.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
@@ -145,47 +145,22 @@ class Snail {
         this.element.style.left = `${x + offset}px`;
         this.element.style.top = `${y + offset}px`;
         
-        // Обновляем поворот и отражение в зависимости от направления
-        let rotation = 0;
+        // Меняем только отражение по горизонтали в зависимости от направления
         let scaleX = 1; // По умолчанию без отражения
-        let scaleY = 1; // По умолчанию без отражения по вертикали
         
-        switch (this.currentDirection) {
-            case 'up': 
-                rotation = -90; 
-                break;
-            case 'right': 
-                rotation = 0; 
-                scaleX = 1; // Нормальное отображение
-                break;
-            case 'down': 
-                rotation = 90; 
-                break;
-            case 'left': 
-                rotation = 0; // Не поворачиваем
-                scaleX = -1; // Отражаем по горизонтали
-                break;
+        // Теперь улитка не поворачивается, а только отражается при движении влево
+        if (this.currentDirection === 'left') {
+            scaleX = -1; // Отражаем по горизонтали
         }
         
         // Получаем потомка-изображение
         const snailImage = this.element.querySelector('img');
         if (snailImage) {
-            // Для более естественного вида улитки, сначала сбрасываем все трансформации
-            snailImage.style.transform = '';
-            
-            // Меняем положение изображения внутри контейнера для более плавного эффекта
-            if (this.currentDirection === 'left') {
-                // При движении влево отражаем только изображение
-                snailImage.style.transform = 'scaleX(-1)';
-                // К самому контейнеру применяем только поворот
-                this.element.style.transform = `rotate(${rotation}deg)`;
-            } else {
-                // Для остальных направлений применяем трансформацию к контейнеру
-                this.element.style.transform = `rotate(${rotation}deg)`;
-            }
+            // Применяем только горизонтальное отражение при движении влево
+            snailImage.style.transform = scaleX === -1 ? 'scaleX(-1)' : '';
         } else {
-            // Запасной вариант, если img не найден (старый метод)
-            this.element.style.transform = `rotate(${rotation}deg) scaleX(${scaleX})`;
+            // Запасной вариант, если img не найден
+            this.element.style.transform = `scaleX(${scaleX})`;
         }
     }
     
@@ -619,96 +594,149 @@ class Snail {
     update(deltaTime) {
         if (!this.isMoving || this.hasFinished) return;
         
-        // Проверяем, прошло ли достаточно времени для хода
+        // Проверяем эффекты и состояния
+        this.updateEffects(deltaTime);
+        
+        // Получаем текущее время
         const currentTime = Date.now();
         const timeElapsed = currentTime - this.lastMoveTime;
         
+        // Если прошло достаточно времени для хода
         if (timeElapsed >= this.getMoveInterval()) {
-            // Двигаем улитку
-            this.move();
+            // Выполняем движение улитки
+            this.performMove();
             
-            // Обновляем время последнего хода
+            // Обновляем время последнего движения
             this.lastMoveTime = currentTime;
         }
     }
     
     /**
-     * Выполнение одного шага движения
+     * Обновление эффектов улитки
      */
-    move() {
-        // Если улитка финишировала, не двигаем её
-        if (this.hasFinished) return;
+    updateEffects(deltaTime) {
+        // Обновляем состояние ускорения
+        if (this.turboBoost) {
+            this.turboBoostTimer -= deltaTime;
+            if (this.turboBoostTimer <= 0) {
+                this.turboBoost = false;
+            }
+        }
         
-        // Если улитка застряла, ничего не делаем
-        if (this.stuck) return;
+        // Обновляем состояние дезориентации
+        if (this.disoriented) {
+            this.disorientedTime -= deltaTime;
+            if (this.disorientedTime <= 0) {
+                this.disoriented = false;
+            }
+        }
+    }
+    
+    /**
+     * Выполнение движения улитки
+     */
+    performMove() {
+        // Если улитка финишировала или застряла, не двигаем её
+        if (this.hasFinished || this.stuck) return;
         
         try {
             // Если путь закончился или не установлен, генерируем новый
             if (!this.path || this.path.length === 0 || this.currentPathIndex >= this.path.length - 1) {
                 this.generatePath();
+                this.currentPathIndex = 0;
+                
                 if (!this.path || this.path.length < 2) {
                     console.warn(`Не удалось сгенерировать путь для улитки ${this.type}`);
                     return;
                 }
-                this.currentPathIndex = 0;
             }
             
             // Получаем текущую и следующую точки пути
             const currentPoint = this.path[this.currentPathIndex];
             const nextPoint = this.path[this.currentPathIndex + 1];
             
-            // Проверка валидности координат следующей точки
-            if (!nextPoint || 
-                nextPoint.row < 0 || nextPoint.row >= this.maze.rows ||
-                nextPoint.col < 0 || nextPoint.col >= this.maze.cols) {
-                console.error(`Невалидные координаты для улитки ${this.type}: [${nextPoint?.row}, ${nextPoint?.col}]`);
-                // Генерируем новый путь при обнаружении ошибки
+            // Проверка валидности координат
+            if (!this.validateNextPoint(nextPoint)) {
+                // Генерируем новый путь при ошибке
                 this.generatePath();
                 return;
             }
             
             // Определяем направление движения
-            const prevDirection = this.currentDirection;
-            this.currentDirection = this.getDirection(
-                { row: this.row, col: this.col },
-                nextPoint
-            );
-            
-            // Логируем изменение направления для отладки
-            if (prevDirection !== this.currentDirection) {
-                console.log(`Улитка ${this.type} изменила направление с ${prevDirection} на ${this.currentDirection}`);
-            }
+            this.updateDirection(nextPoint);
             
             // Обновляем позицию
             this.row = nextPoint.row;
             this.col = nextPoint.col;
             
-            // Отладочная информация о движении
-            console.log(`Улитка ${this.type} переместилась на [${this.row}, ${this.col}], направление: ${this.currentDirection}`);
-            
             // Увеличиваем индекс пути
             this.currentPathIndex++;
             
-            // Проверяем, достигли ли финиша
-            if (this.maze.finish && 
-                this.row === this.maze.finish.row && 
-                this.col === this.maze.finish.col) {
-                console.log(`Улитка ${this.type} достигла финиша!`);
-                // Отправляем событие о финише улитки
-                const event = new CustomEvent('snailFinished', { detail: this });
-                document.dispatchEvent(event);
-            }
+            // Проверяем достижение финиша
+            this.checkFinish();
             
-            // Проверяем специальные ячейки (ловушки, ускорители)
+            // Проверяем специальные ячейки
             this.checkSpecialCells();
+            
         } catch (error) {
             console.error(`Ошибка при движении улитки ${this.type}:`, error);
-            // Восстанавливаем улитку после ошибки
-            if (this.maze && this.maze.start) {
-                this.row = this.maze.start.row;
-                this.col = this.maze.start.col;
-                this.generatePath();
-            }
+            // Восстанавливаемся после ошибки
+            this.resetPosition();
+        }
+    }
+    
+    /**
+     * Проверка валидности следующей точки
+     */
+    validateNextPoint(nextPoint) {
+        if (!nextPoint || 
+            nextPoint.row < 0 || nextPoint.row >= this.maze.rows ||
+            nextPoint.col < 0 || nextPoint.col >= this.maze.cols) {
+            console.error(`Невалидные координаты для улитки ${this.type}: [${nextPoint?.row}, ${nextPoint?.col}]`);
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Обновление направления улитки
+     */
+    updateDirection(nextPoint) {
+        const prevDirection = this.currentDirection;
+        this.currentDirection = this.getDirection(
+            { row: this.row, col: this.col },
+            nextPoint
+        );
+        
+        // Логируем изменение направления для отладки
+        if (prevDirection !== this.currentDirection) {
+            console.log(`Улитка ${this.type} изменила направление с ${prevDirection} на ${this.currentDirection}`);
+        }
+    }
+    
+    /**
+     * Проверка достижения финиша
+     */
+    checkFinish() {
+        if (this.maze.finish && 
+            this.row === this.maze.finish.row && 
+            this.col === this.maze.finish.col) {
+            console.log(`Улитка ${this.type} достигла финиша!`);
+            // Отправляем событие о финише улитки
+            this.hasFinished = true;
+            const event = new CustomEvent('snailFinished', { detail: this });
+            document.dispatchEvent(event);
+        }
+    }
+    
+    /**
+     * Сброс позиции улитки
+     */
+    resetPosition() {
+        if (this.maze && this.maze.start) {
+            this.row = this.maze.start.row;
+            this.col = this.maze.start.col;
+            this.generatePath();
         }
     }
     
@@ -749,124 +777,124 @@ class Snail {
      * @param {CanvasRenderingContext2D} ctx - контекст для рисования
      */
     draw(ctx) {
-        // Проверяем, есть ли у улитки координаты
+        // Если у улитки нет координат, пропускаем отрисовку
         if (this.row === undefined || this.col === undefined) {
             console.error(`Ошибка: улитка типа ${this.type} не имеет корректных координат`);
             return;
         }
         
-        // Получаем координаты центра ячейки
-        const x = this.col * this.cellSize;
-        const y = this.row * this.cellSize;
+        // Рассчитываем текущую позицию для плавного движения
+        let currentX, currentY;
         
-        // Размер улитки - увеличим для лучшей видимости
-        const snailSize = this.cellSize * 0.9;
+        // Если улитка движется, выполняем интерполяцию
+        if (this.isMoving && this.path && this.path.length > 0 && this.currentPathIndex < this.path.length) {
+            // Определяем точку назначения
+            const targetCell = this.path[this.currentPathIndex];
+            
+            // Вычисляем целевые координаты в пикселях
+            const targetX = targetCell.col * this.cellSize;
+            const targetY = targetCell.row * this.cellSize;
+            
+            // Текущие координаты в пикселях
+            const startX = this.col * this.cellSize;
+            const startY = this.row * this.cellSize;
+            
+            // Прогресс движения (от 0 до 1)
+            const timeElapsed = Date.now() - this.lastMoveTime;
+            const moveInterval = this.getMoveInterval();
+            let progress = Math.min(timeElapsed / moveInterval, 1);
+            
+            // Применяем более плавную функцию для естественного движения
+            progress = this.easeInOutQuad(progress);
+            
+            // Интерполируем между текущим и следующим положением
+            currentX = startX + (targetX - startX) * progress;
+            currentY = startY + (targetY - startY) * progress;
+        } else {
+            // Если улитка не в движении, используем её текущие координаты
+            currentX = this.col * this.cellSize;
+            currentY = this.row * this.cellSize;
+        }
         
         // Сохраняем состояние контекста
         ctx.save();
         
-        // Перемещаем в центр ячейки
-        ctx.translate(x + this.cellSize / 2, y + this.cellSize / 2);
+        // Определяем размер изображения улитки (немного меньше ячейки)
+        const snailSize = this.cellSize * 0.9;
         
-        // Применяем поворот в зависимости от направления
-        let rotation = 0;
-        switch (this.currentDirection) {
-            case 'up': rotation = -Math.PI / 2; break;
-            case 'right': rotation = 0; break;
-            case 'down': rotation = Math.PI / 2; break;
-            case 'left': rotation = Math.PI; break;
+        // Перемещаемся к позиции улитки
+        ctx.translate(currentX + this.cellSize / 2, currentY + this.cellSize / 2);
+        
+        // Применяем только отражение для движения влево, без поворотов
+        let scaleX = 1;
+        if (this.currentDirection === 'left') {
+            scaleX = -1;
+            ctx.scale(scaleX, 1);
         }
-        ctx.rotate(rotation);
         
-        // Добавляем тень для улучшения видимости на любом фоне
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 10;
+        // Определяем, какое изображение улитки использовать на основе типа
+        let imagePath;
+        switch (this.type) {
+            case 'racer':
+                imagePath = 'images/red_snail.png';
+                break;
+            case 'explorer':
+                imagePath = 'images/blue_snail.png';
+                break;
+            case 'snake':
+                imagePath = 'images/green_snail.png';
+                break;
+            case 'stubborn':
+                imagePath = 'images/purple_snail.png';
+                break;
+            case 'deadender':
+                imagePath = 'images/yellow_snail.png';
+                break;
+            default:
+                imagePath = 'images/blue_snail.png';
+        }
+        
+        // Получаем изображение из кэша ASSETS или создаем новое
+        let snailImage;
+        if (ASSETS.snailImages[this.type]) {
+            snailImage = ASSETS.snailImages[this.type];
+        } else {
+            snailImage = new Image();
+            snailImage.src = imagePath;
+            ASSETS.snailImages[this.type] = snailImage;
+        }
+        
+        // Добавляем тень для эффекта глубины
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
-        // Отрисовываем улитку с яркими цветами для лучшей видимости
-        // Для игрока используем яркий цвет, для остальных - их собственные цвета
-        const color = this.isPlayer ? '#FF00FF' : this.color;
-        
-        // 1. Рисуем корпус улитки (увеличенный)
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(0, 0, snailSize / 2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 2. Добавляем обводку для лучшей видимости
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // 3. Рисуем панцирь (узор спирали)
-        const spiralColor = this.isPlayer ? '#FFFFFF' : '#EEEEEE';
-        ctx.strokeStyle = spiralColor;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        for (let i = 0; i < 3; i++) {
-            const radius = (snailSize / 2) * (0.8 - i * 0.2);
-            ctx.arc(0, 0, radius, 0, Math.PI * 1.5);
+        // Проверяем, загружено ли изображение
+        if (snailImage && snailImage.complete) {
+            // Отрисовываем изображение улитки
+            ctx.drawImage(
+                snailImage,
+                -snailSize / 2,
+                -snailSize / 2,
+                snailSize,
+                snailSize
+            );
+        } else {
+            // Запасной вариант, если изображение не загружено
+            this.drawFallbackSnail(ctx, snailSize);
         }
-        ctx.stroke();
         
-        // 4. Рисуем глаза (более заметные)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowBlur = 0; // Убираем тень для глаз
-        ctx.beginPath();
-        ctx.arc(snailSize / 3, -snailSize / 6, snailSize / 8, 0, Math.PI * 2);
-        ctx.arc(snailSize / 3, snailSize / 6, snailSize / 8, 0, Math.PI * 2);
-        ctx.fill();
+        // Добавляем эффекты в зависимости от состояния
+        if (this.turboBoost) {
+            this.drawTurboEffect(ctx, snailSize);
+        }
         
-        // 5. Зрачки (более контрастные)
-        ctx.fillStyle = '#000000';
-        ctx.beginPath();
-        ctx.arc(snailSize / 3, -snailSize / 6, snailSize / 16, 0, Math.PI * 2);
-        ctx.arc(snailSize / 3, snailSize / 6, snailSize / 16, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 6. Добавляем антенны
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        // Левая антенна
-        ctx.moveTo(snailSize / 3, -snailSize / 6);
-        ctx.lineTo(snailSize / 2, -snailSize / 3);
-        // Правая антенна
-        ctx.moveTo(snailSize / 3, snailSize / 6);
-        ctx.lineTo(snailSize / 2, snailSize / 3);
-        ctx.stroke();
-        
-        // Маленькие шарики на концах антенн
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(snailSize / 2, -snailSize / 3, snailSize / 16, 0, Math.PI * 2);
-        ctx.arc(snailSize / 2, snailSize / 3, snailSize / 16, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Добавляем эффекты в зависимости от состояния улитки
         if (this.stuck) {
-            // Эффект застревания - добавляем восклицательные знаки
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-            ctx.font = `bold ${snailSize/3}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('!', -snailSize/3, -snailSize/3);
-        } else if (this.turboBoost) {
-            // Эффект ускорения - добавляем полоски сзади
-            ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-            ctx.lineWidth = 3;
-            
-            // Волны ускорения позади улитки
-            for (let i = 1; i <= 3; i++) {
-                ctx.beginPath();
-                ctx.moveTo(-snailSize / 2 - i * 6, -snailSize / 4);
-                ctx.lineTo(-snailSize / 2 - i * 6, snailSize / 4);
-                ctx.stroke();
-            }
+            this.drawStuckEffect(ctx, snailSize);
         }
         
-        // Для улитки игрока добавляем индикатор
+        // Для улитки игрока добавляем индикатор выделения
         if (this.isPlayer) {
             ctx.beginPath();
             ctx.arc(0, 0, snailSize / 2 + 5, 0, Math.PI * 2);
@@ -879,23 +907,84 @@ class Snail {
         
         // Восстанавливаем состояние контекста
         ctx.restore();
+    }
+    
+    /**
+     * Запасной вариант отрисовки улитки, если изображение не загружено
+     */
+    drawFallbackSnail(ctx, size) {
+        // Рисуем базовую форму улитки
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+        ctx.fill();
         
-        console.log(`Отрисована улитка ${this.type} на позиции [${this.row}, ${this.col}], направление: ${this.currentDirection}`);
+        // Добавляем обводку
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Добавляем глаза
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(size / 3, -size / 6, size / 10, 0, Math.PI * 2);
+        ctx.arc(size / 3, size / 6, size / 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Зрачки
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(size / 3, -size / 6, size / 20, 0, Math.PI * 2);
+        ctx.arc(size / 3, size / 6, size / 20, 0, Math.PI * 2);
+        ctx.fill();
     }
     
     /**
-     * Запуск движения улитки
+     * Эффект ускорения для улитки
      */
-    startMoving() {
-        this.isMoving = true;
-        this.lastMoveTime = Date.now();
+    drawTurboEffect(ctx, size) {
+        ctx.save();
+        
+        // Настраиваем стиль для эффекта
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
+        ctx.lineWidth = 3;
+        
+        // Создаем волны ускорения позади улитки
+        for (let i = 1; i <= 3; i++) {
+            ctx.globalAlpha = 1 - (i * 0.2); // Постепенное затухание
+            ctx.beginPath();
+            ctx.moveTo(-size / 2 - i * 8, -size / 3);
+            ctx.lineTo(-size / 2 - i * 8, size / 3);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
     }
     
     /**
-     * Остановка движения улитки
+     * Эффект застревания для улитки
      */
-    stopMoving() {
-        this.isMoving = false;
+    drawStuckEffect(ctx, size) {
+        ctx.save();
+        
+        // Рисуем знаки вопроса или восклицательные знаки
+        ctx.fillStyle = '#FF0000';
+        ctx.font = `bold ${size/2}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('!', 0, -size/2 - 10);
+        
+        ctx.restore();
+    }
+    
+    /**
+     * Функция плавного ускорения-замедления (easing)
+     * @param {number} t - значение от 0 до 1
+     * @returns {number} обработанное значение от 0 до 1
+     */
+    easeInOutQuad(t) {
+        // Более плавная функция с кубическим сглаживанием
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
     
     /**

@@ -1,7 +1,7 @@
 /**
  * Модуль управления ресурсами и константами игры
  */
-const ASSETS = {
+const GAME_ASSETS = {
     // Настройки изображений
     IMAGES: {
         SNAILS: {
@@ -68,7 +68,7 @@ const ASSETS = {
             TYPE: 'racer',
             NAME: 'Racer',
             DESCRIPTION: 'Быстрая и может получать случайное ускорение',
-            BASE_SPEED: 5.5,
+            BASE_SPEED: 4.5,
             SPEED_VARIATION: 1,
             BOOST_PROBABILITY: 0.2,
             BOOST_MULTIPLIER: 1.3,
@@ -78,7 +78,7 @@ const ASSETS = {
             TYPE: 'explorer',
             NAME: 'Explorer',
             DESCRIPTION: 'Исследует лабиринт и может найти короткие пути',
-            BASE_SPEED: 4.5,
+            BASE_SPEED: 3.5,
             SPEED_VARIATION: 0.5,
             EXPLORATION_RATE: 0.65,
             COLOR: '#0000ff'
@@ -87,7 +87,7 @@ const ASSETS = {
             TYPE: 'snake',
             NAME: 'Snake',
             DESCRIPTION: 'Передвигается зигзагом и быстрее выходит из тупиков',
-            BASE_SPEED: 5.0,
+            BASE_SPEED: 4.0,
             SPEED_VARIATION: 0.7,
             ZIGZAG_PROBABILITY: 0.7,
             COLOR: '#00ff00'
@@ -96,7 +96,7 @@ const ASSETS = {
             TYPE: 'stubborn',
             NAME: 'Stubborn',
             DESCRIPTION: 'Упрямо движется в выбранном направлении',
-            BASE_SPEED: 5.2,
+            BASE_SPEED: 4.2,
             SPEED_VARIATION: 0.8,
             FORWARD_PROBABILITY: 0.85,
             COLOR: '#800080'
@@ -105,7 +105,7 @@ const ASSETS = {
             TYPE: 'deadender',
             NAME: 'Deadender',
             DESCRIPTION: 'Любит заходить в тупики и неожиданно менять направление',
-            BASE_SPEED: 4.8,
+            BASE_SPEED: 3.8,
             SPEED_VARIATION: 1.2,
             RANDOM_TURN_PROBABILITY: 0.6,
             COLOR: '#ffff00'
@@ -128,6 +128,50 @@ const ASSETS = {
         DIFFICULTY: 'medium'      // Сложность по умолчанию
     },
     
+    // Константы для улучшения игровых эффектов
+    MAZE_STYLES: {
+        // Толщина стен
+        WALL_THICKNESS: 4,
+        
+        // Цвета для разных элементов лабиринта
+        COLORS: {
+            BACKGROUND: '#f0f0f0',
+            WALL: '#333333',
+            PATH: '#ffffff',
+            START: '#00ff00',
+            FINISH: '#ff0000',
+            VISITED: '#e0e0ff',
+            CURRENT: '#ffff00'
+        },
+        
+        // Эффекты для элементов
+        EFFECTS: {
+            SHADOW: true,
+            GLOW: true,
+            ROUNDED_CORNERS: true
+        }
+    },
+    
+    // Параметры анимации
+    ANIMATION: {
+        // Скорость анимации (мс)
+        SPEED: 300,
+        
+        // Плавность переходов
+        EASING: 'easeInOutCubic'
+    },
+    
+    // Объекты для хранения загруженных ресурсов
+    images: {},
+    snailImages: {},
+    
+    // Флаг, указывающий загружены ли все ресурсы
+    loaded: false,
+    
+    // Счетчики для загрузки
+    loadedCount: 0,
+    totalResources: 0,
+    
     // Список всех ресурсов
     RESOURCES: [
         'images/red_snail.png',
@@ -141,7 +185,99 @@ const ASSETS = {
         'images/finish.png'
     ],
     
-    // Функция для загрузки ресурсов
+    /**
+     * Инициализация и загрузка всех ресурсов
+     * @param {Function} callback - функция, которая будет вызвана после загрузки всех ресурсов
+     */
+    init: function(callback) {
+        // Загружаем общие изображения
+        this.loadImages({
+            'background': 'images/background.png',
+            'maze_tile': 'images/path_texture.png',
+            'wall': 'images/wall_texture.png',
+            'start': 'images/start.png',
+            'finish': 'images/finish.png'
+        });
+        
+        // Загружаем изображения улиток для разных типов
+        this.loadSnailImages({
+            'player': 'images/red_snail.png',
+            'regular': 'images/blue_snail.png',
+            'fast': 'images/green_snail.png',
+            'smart': 'images/red_snail.png',
+            'racer': 'images/red_snail.png',
+            'explorer': 'images/blue_snail.png',
+            'snake': 'images/green_snail.png',
+            'stubborn': 'images/purple_snail.png',
+            'deadender': 'images/yellow_snail.png'
+        });
+        
+        // Функция проверки загрузки всех ресурсов
+        const checkAllLoaded = () => {
+            if (this.loadedCount === this.totalResources) {
+                this.loaded = true;
+                if (callback) callback();
+            } else {
+                // Проверяем каждые 100 мс
+                setTimeout(checkAllLoaded, 100);
+            }
+        };
+        
+        // Запускаем проверку загрузки
+        checkAllLoaded();
+    },
+    
+    /**
+     * Загрузка списка изображений
+     * @param {Object} imageList - объект с путями к изображениям
+     */
+    loadImages: function(imageList) {
+        this.totalResources += Object.keys(imageList).length;
+        
+        for (const key in imageList) {
+            const img = new Image();
+            img.onload = () => {
+                this.loadedCount++;
+                console.log(`Загружено изображение: ${key}`);
+            };
+            img.onerror = () => {
+                console.error(`Ошибка загрузки изображения: ${key}`);
+                // Увеличиваем счетчик, чтобы не блокировать загрузку
+                this.loadedCount++;
+            };
+            img.src = imageList[key];
+            this.images[key] = img;
+        }
+    },
+    
+    /**
+     * Загрузка изображений улиток
+     * @param {Object} snailImages - объект с путями к изображениям улиток
+     */
+    loadSnailImages: function(snailImages) {
+        this.totalResources += Object.keys(snailImages).length;
+        
+        for (const type in snailImages) {
+            const img = new Image();
+            img.onload = () => {
+                this.loadedCount++;
+                console.log(`Загружено изображение улитки: ${type}`);
+            };
+            img.onerror = () => {
+                console.error(`Ошибка загрузки изображения улитки: ${type}`);
+                // Создаем заглушку, чтобы не блокировать загрузку
+                this.loadedCount++;
+            };
+            img.src = snailImages[type];
+            this.snailImages[type] = img;
+        }
+    },
+    
+    /**
+     * Функция для загрузки ресурсов (старый метод, сохраняем для совместимости)
+     * @param {Function} onProgress - коллбэк прогресса загрузки
+     * @param {Function} onComplete - коллбэк завершения загрузки
+     */
     loadResources: function(onProgress, onComplete) {
         let loaded = 0;
         const total = this.RESOURCES.length;
@@ -178,5 +314,55 @@ const ASSETS = {
                 onComplete();
             }
         });
+    },
+    
+    /**
+     * Получение изображения по ключу
+     * @param {string} key - ключ изображения
+     * @returns {Image|null} - объект изображения или null, если изображение не найдено
+     */
+    getImage: function(key) {
+        return this.images[key] || null;
+    },
+    
+    /**
+     * Получение изображения улитки по типу
+     * @param {string} type - тип улитки
+     * @returns {Image|null} - объект изображения или null, если изображение не найдено
+     */
+    getSnailImage: function(type) {
+        // Если нет изображения для конкретного типа, возвращаем изображение обычной улитки
+        return this.snailImages[type] || this.snailImages['regular'] || null;
+    },
+    
+    /**
+     * Проверка загрузки всех ресурсов
+     * @returns {boolean} - true, если все ресурсы загружены
+     */
+    isLoaded: function() {
+        return this.loaded;
+    },
+    
+    /**
+     * Получение прогресса загрузки ресурсов
+     * @returns {number} - процент загрузки от 0 до 100
+     */
+    getLoadingProgress: function() {
+        if (this.totalResources === 0) return 100;
+        return Math.floor((this.loadedCount / this.totalResources) * 100);
     }
-}; 
+};
+
+// Для совместимости со старым кодом создаем ссылку на GAME_ASSETS
+const ASSETS = GAME_ASSETS;
+
+/**
+ * Инициализация ресурсов
+ */
+function initializeAssets() {
+    // Создаем объект для хранения загруженных изображений улиток
+    ASSETS.snailImages = {};
+}
+
+// Вызываем инициализацию ресурсов
+initializeAssets(); 

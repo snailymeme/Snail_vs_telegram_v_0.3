@@ -62,6 +62,12 @@ class Game {
         this.newBalance = document.getElementById('new-balance');
         this.playAgainButton = document.getElementById('play-again');
         
+        // Элементы масштабирования
+        this.zoomInButton = document.getElementById('zoom-in');
+        this.zoomOutButton = document.getElementById('zoom-out');
+        this.zoomResetButton = document.getElementById('zoom-reset');
+        this.scaleIndicator = document.getElementById('scale-indicator');
+        
         // Создаем Canvas для лабиринта
         this.createCanvas();
         
@@ -104,8 +110,8 @@ class Game {
         
         // Получаем настройки лабиринта из ASSETS
         const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
-        const rows = mazeConfig.ROWS;
-        const cols = mazeConfig.COLS;
+        const rows = mazeConfig.ROWS + 5; // Добавляем +5 рядов 
+        const cols = mazeConfig.COLS + 5; // Добавляем +5 колонок 
         const cellSize = ASSETS.CELL_SIZE;
         
         // Устанавливаем размеры canvas
@@ -117,6 +123,159 @@ class Game {
         
         // Получаем контекст для рисования
         this.ctx = this.canvas.getContext('2d');
+        
+        // Инициализируем параметры масштабирования и перемещения
+        this.scale = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        
+        // Добавляем обработчики для зума и перемещения
+        this.initZoomAndPanEvents();
+    }
+    
+    /**
+     * Инициализация обработчиков событий для зума и перемещения
+     */
+    initZoomAndPanEvents() {
+        // Обработчик колеса мыши для зума
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            // Определяем положение курсора относительно канваса
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Определяем направление прокрутки и изменение масштаба
+            const delta = -Math.sign(e.deltaY) * 0.1;
+            const newScale = Math.max(0.5, Math.min(3, this.scale + delta));
+            
+            // Расчет нового смещения для зума к точке курсора
+            if (this.scale !== newScale) {
+                const scaleRatio = newScale / this.scale;
+                this.offsetX = mouseX - (mouseX - this.offsetX) * scaleRatio;
+                this.offsetY = mouseY - (mouseY - this.offsetY) * scaleRatio;
+                this.scale = newScale;
+                
+                // Обновляем индикатор масштаба
+                this.updateScaleIndicator();
+                
+                // Перерисовываем лабиринт
+                this.drawMaze();
+            }
+        });
+        
+        // Обработчик нажатия мыши для начала перемещения
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            this.canvas.style.cursor = 'grabbing';
+        });
+        
+        // Обработчик перемещения мыши
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.isDragging) {
+                const deltaX = e.clientX - this.lastMouseX;
+                const deltaY = e.clientY - this.lastMouseY;
+                
+                this.offsetX += deltaX;
+                this.offsetY += deltaY;
+                
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
+                
+                // Перерисовываем лабиринт
+                this.drawMaze();
+            }
+        });
+        
+        // Обработчик отпускания кнопки мыши
+        this.canvas.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            this.canvas.style.cursor = 'grab';
+        });
+        
+        // Обработчик выхода курсора за пределы канваса
+        this.canvas.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+            this.canvas.style.cursor = 'default';
+        });
+        
+        // Инициализация стиля курсора
+        this.canvas.style.cursor = 'grab';
+        
+        // Добавляем сенсорную поддержку для мобильных устройств
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                this.isDragging = true;
+                this.lastMouseX = e.touches[0].clientX;
+                this.lastMouseY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                // Сохраняем начальное расстояние между пальцами для масштабирования
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                this.initialPinchDistance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                this.initialScale = this.scale;
+            }
+        }, { passive: false });
+        
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1 && this.isDragging) {
+                e.preventDefault();
+                const deltaX = e.touches[0].clientX - this.lastMouseX;
+                const deltaY = e.touches[0].clientY - this.lastMouseY;
+                
+                this.offsetX += deltaX;
+                this.offsetY += deltaY;
+                
+                this.lastMouseX = e.touches[0].clientX;
+                this.lastMouseY = e.touches[0].clientY;
+                
+                // Перерисовываем лабиринт
+                this.drawMaze();
+            } else if (e.touches.length === 2) {
+                e.preventDefault();
+                // Вычисляем новое расстояние для масштабирования
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentPinchDistance = Math.hypot(
+                    touch1.clientX - touch2.clientX,
+                    touch1.clientY - touch2.clientY
+                );
+                
+                // Вычисляем центр между двумя точками касания
+                const centerX = (touch1.clientX + touch2.clientX) / 2;
+                const centerY = (touch1.clientY + touch2.clientY) / 2;
+                
+                // Вычисляем новый масштаб
+                const pinchRatio = currentPinchDistance / this.initialPinchDistance;
+                const newScale = Math.max(0.5, Math.min(3, this.initialScale * pinchRatio));
+                
+                // Применяем масштаб и обновляем смещение
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasX = centerX - rect.left;
+                const canvasY = centerY - rect.top;
+                
+                this.offsetX = canvasX - (canvasX - this.offsetX) * (newScale / this.scale);
+                this.offsetY = canvasY - (canvasY - this.offsetY) * (newScale / this.scale);
+                this.scale = newScale;
+                
+                // Перерисовываем лабиринт
+                this.drawMaze();
+            }
+        }, { passive: false });
+        
+        this.canvas.addEventListener('touchend', () => {
+            this.isDragging = false;
+        });
     }
     
     /**
@@ -147,6 +306,25 @@ class Game {
         this.playAgainButton.addEventListener('click', () => {
             this.showSelectionScreen();
         });
+        
+        // Кнопки масштабирования
+        if (this.zoomInButton) {
+            this.zoomInButton.addEventListener('click', () => {
+                this.zoomIn();
+            });
+        }
+        
+        if (this.zoomOutButton) {
+            this.zoomOutButton.addEventListener('click', () => {
+                this.zoomOut();
+            });
+        }
+        
+        if (this.zoomResetButton) {
+            this.zoomResetButton.addEventListener('click', () => {
+                this.resetZoom();
+            });
+        }
         
         // События гонки
         document.addEventListener('raceFinished', (event) => {
@@ -279,7 +457,7 @@ class Game {
         this.mazeStyleDisplay.textContent = this.maze.getStyleName();
         
         // Отрисовываем лабиринт
-        this.renderMaze();
+        this.drawMaze();
         
         // Обновляем отображение текущей ставки
         this.currentBetDisplay.textContent = this.bet;
@@ -300,58 +478,105 @@ class Game {
      * Запуск гонки
      */
     startRace() {
-        // Проверка, выбрана ли улитка
+        // Проверяем, выбрана ли улитка
         if (!this.selectedSnailType) {
-            alert('Пожалуйста, выберите улитку!');
+            alert('Пожалуйста, выберите улитку для гонки!');
             return;
         }
         
-        // Проверка баланса
-        if (this.balance < this.bet) {
+        // Проверяем, достаточно ли баланса для ставки
+        if (this.bet > this.balance) {
             alert('Недостаточно средств для ставки!');
             return;
         }
         
-        // Списываем средства
+        // Списываем ставку с баланса
         this.balance -= this.bet;
         this.updateBalanceDisplay();
-        
-        // Создаем новый лабиринт с случайным стилем
-        this.maze = new Maze(this.difficulty);
-        
-        // Создаем менеджер улиток
-        this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
         
         // Показываем игровой экран
         this.showGameScreen();
         
-        // Обновляем статус гонки
-        this.raceStatusDisplay.textContent = 'Гонка началась!';
-        this.isRaceActive = true;
-        this.raceStartTime = Date.now();
+        // Создаем новый лабиринт, используя увеличенные размеры
+        const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
+        const rows = mazeConfig.ROWS + 5; // Добавляем +5 рядов
+        const cols = mazeConfig.COLS + 5; // Добавляем +5 колонок
         
-        // Запускаем улиток
+        // Создаем экземпляр генератора лабиринта
+        const mazeGenerator = new MazeGenerator(rows, cols, this.difficulty);
+        
+        // Генерируем новый лабиринт
+        const mazeData = mazeGenerator.generate();
+        
+        // Создаем экземпляр лабиринта
+        this.maze = new Maze(mazeData.grid, mazeData.start, mazeData.finish);
+        
+        // Отображаем текущий стиль лабиринта
+        this.mazeStyleDisplay.textContent = this.maze.style.name;
+        
+        // Создаем менеджер улиток
+        this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
+        
+        // Устанавливаем начальное смещение для центрирования лабиринта
+        const cellSize = ASSETS.CELL_SIZE;
+        this.scale = 1.0; // Увеличиваем начальный масштаб для лучшей видимости
+        this.offsetX = (this.canvas.width / 2) - (cols * cellSize * this.scale / 2);
+        this.offsetY = (this.canvas.height / 2) - (rows * cellSize * this.scale / 2);
+        
+        // Обновляем индикатор масштаба
+        this.updateScaleIndicator();
+        
+        // Отрисовываем лабиринт
+        this.drawMaze();
+        
+        // Обновляем отображение ставки
+        this.currentBetDisplay.textContent = this.bet;
+        
+        // Устанавливаем таймер гонки
+        this.raceStartTime = Date.now();
+        this.isRaceActive = true;
+        
+        // Запускаем гонку улиток
         this.snailManager.startRace();
         
-        // Устанавливаем таймаут на максимальную длительность гонки
+        // Устанавливаем статус гонки
+        this.raceStatusDisplay.textContent = 'Гонка началась!';
+        
+        // Устанавливаем таймер для автоматического завершения гонки
         this.raceTimeout = setTimeout(() => {
             if (this.isRaceActive) {
-                this.endRace();
+                console.log('Время гонки истекло, принудительное завершение');
+                this.forceEndRace();
             }
         }, ASSETS.GAME.RACE_DURATION_MS);
     }
     
     /**
-     * Отрисовка лабиринта
+     * Отрисовка лабиринта с учетом масштабирования и смещения
      */
-    renderMaze() {
+    drawMaze() {
         if (!this.maze || !this.ctx) return;
         
         // Очищаем canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
+        // Сохраняем состояние контекста
+        this.ctx.save();
+        
+        // Применяем масштабирование и смещение
+        this.ctx.translate(this.offsetX, this.offsetY);
+        this.ctx.scale(this.scale, this.scale);
+        
         // Отрисовываем лабиринт
         this.maze.draw(this.ctx);
+        
+        // Если есть snailManager, отрисовываем улиток
+        if (this.snailManager) {
+            this.snailManager.draw(this.ctx);
+        }
+        
+        // Восстанавливаем состояние контекста
+        this.ctx.restore();
     }
     
     /**
@@ -460,15 +685,20 @@ class Game {
      * Игровой цикл
      */
     gameLoop(timestamp) {
-        // Вычисляем время, прошедшее с последнего кадра
-        if (!this.lastTimestamp) {
-            this.lastTimestamp = timestamp;
+        // Вычисляем время между кадрами
+        if (!this.lastFrameTime) {
+            this.lastFrameTime = timestamp;
         }
-        const deltaTime = timestamp - this.lastTimestamp;
-        this.lastTimestamp = timestamp;
+        const deltaTime = timestamp - this.lastFrameTime;
+        this.lastFrameTime = timestamp;
         
-        // Обновляем состояние игры
-        this.update(deltaTime);
+        // Если гонка активна, обновляем улиток
+        if (this.isRaceActive && this.snailManager) {
+            this.snailManager.update(deltaTime);
+            
+            // Перерисовываем лабиринт и улиток
+            this.drawMaze();
+        }
         
         // Запрашиваем следующий кадр
         window.requestAnimationFrame(this.gameLoop.bind(this));
@@ -559,6 +789,74 @@ class Game {
         // Принудительно завершаем гонку, если превышено максимальное время
         if (elapsed >= ASSETS.GAME.RACE_DURATION_MS) {
             this.endRace();
+        }
+    }
+    
+    /**
+     * Увеличение масштаба
+     */
+    zoomIn() {
+        const newScale = Math.min(3, this.scale + 0.2);
+        if (this.scale !== newScale) {
+            // Вычисляем центр видимой области
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 2;
+            
+            // Пересчитываем смещение для сохранения центрирования
+            this.offsetX = centerX - (centerX - this.offsetX) * (newScale / this.scale);
+            this.offsetY = centerY - (centerY - this.offsetY) * (newScale / this.scale);
+            
+            this.scale = newScale;
+            this.updateScaleIndicator();
+            this.drawMaze();
+        }
+    }
+    
+    /**
+     * Уменьшение масштаба
+     */
+    zoomOut() {
+        const newScale = Math.max(0.5, this.scale - 0.2);
+        if (this.scale !== newScale) {
+            // Вычисляем центр видимой области
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 2;
+            
+            // Пересчитываем смещение для сохранения центрирования
+            this.offsetX = centerX - (centerX - this.offsetX) * (newScale / this.scale);
+            this.offsetY = centerY - (centerY - this.offsetY) * (newScale / this.scale);
+            
+            this.scale = newScale;
+            this.updateScaleIndicator();
+            this.drawMaze();
+        }
+    }
+    
+    /**
+     * Сброс масштаба
+     */
+    resetZoom() {
+        // Восстанавливаем начальный масштаб и центрируем лабиринт
+        const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
+        const rows = mazeConfig.ROWS + 5; // Добавляем +5 рядов
+        const cols = mazeConfig.COLS + 5; // Добавляем +5 колонок
+        const cellSize = ASSETS.CELL_SIZE;
+        
+        this.scale = 1.0; // Увеличиваем масштаб до 100% для лучшей видимости
+        this.offsetX = (this.canvas.width / 2) - (cols * cellSize * this.scale / 2);
+        this.offsetY = (this.canvas.height / 2) - (rows * cellSize * this.scale / 2);
+        
+        this.updateScaleIndicator();
+        this.drawMaze();
+    }
+    
+    /**
+     * Обновление индикатора масштаба
+     */
+    updateScaleIndicator() {
+        if (this.scaleIndicator) {
+            const scalePercent = Math.round(this.scale * 100);
+            this.scaleIndicator.textContent = `Масштаб: ${scalePercent}%`;
         }
     }
 } 
