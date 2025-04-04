@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futuristic Maze Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        .game-container {
+            position: relative;
+            width: 640px;
+            height: 640px;
+        }
+        #gameCanvas {
+            display: block;
+            border: 1px solid #333;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        .style-name {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        /* Effects */
+        @keyframes glow {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.5); }
+            100% { filter: brightness(1); }
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        @keyframes flicker {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="640" height="640"></canvas>
+        <div class="style-name" id="styleName"></div>
+        <div class="controls">
+            <button id="newGameBtn">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        // Game constants
+        const TILE_SIZE = 32;
+        const ENTITY_SIZE = 16;
+        const GRID_SIZE = 20; // 20x20 grid
+        
+        // Maze styles definition
+        const mazeStyles = [
+            {
+                name: "Neon Cyber Maze",
+                path: {
+                    name: "NeonBluePath",
+                    color: "#00FFFF",
+                    effect: "glow"
+                },
+                wall: {
+                    name: "NeonPinkWall",
+                    color: "#FF69B4",
+                    effect: "glow"
+                },
+                entity: {
+                    name: "PlayerDot",
+                    color: "#FFFFFF",
+                    effect: "pulse"
+                }
+            },
+            {
+                name: "Holographic Grid",
+                path: {
+                    name: "HoloFloor",
+                    color: "#C0C0C0",
+                    effect: "flicker"
+                },
+                wall: {
+                    name: "HoloWall",
+                    color: "#00B7EB",
+                    effect: "transparency"
+                },
+                entity: {
+                    name: "HoloEntity",
+                    color: "#FF00FF",
+                    effect: "float"
+                }
+            },
+            {
+                name: "Alien Jungle Maze",
+                path: {
+                    name: "BiolumPath",
+                    color: "#00FF00",
+                    effect: "glow"
+                },
+                wall: {
+                    name: "VineWall",
+                    color: "#800080",
+                    effect: "texture"
+                },
+                entity: {
+                    name: "AlienDot",
+                    color: "#FF4500",
+                    effect: "blink"
+                }
+            },
+            {
+                name: "Quantum Circuit Board",
+                path: {
+                    name: "CircuitPath",
+                    color: "#FFFF00",
+                    effect: "electric"
+                },
+                wall: {
+                    name: "CircuitWall",
+                    color: "#000000",
+                    effect: "pattern"
+                },
+                entity: {
+                    name: "QuantumDot",
+                    color: "#00FF00",
+                    effect: "pulse"
+                }
+            },
+            {
+                name: "Crystal Cave",
+                path: {
+                    name: "CrystalPath",
+                    color: "#00CED1",
+                    effect: "sparkle"
+                },
+                wall: {
+                    name: "RockWall",
+                    color: "#2F4F4F",
+                    effect: "texture"
+                },
+                entity: {
+                    name: "GemEntity",
+                    color: "#FF1493",
+                    effect: "glow"
+                }
+            },
+            {
+                name: "Space Station Corridors",
+                path: {
+                    name: "MetalPath",
+                    color: "#C0C0C0",
+                    effect: "metallic"
+                },
+                wall: {
+                    name: "RedBarrier",
+                    color: "#FF0000",
+                    effect: "glow"
+                },
+                entity: {
+                    name: "AstroDot",
+                    color: "#00FFFF",
+                    effect: "orbit"
+                }
+            },
+            {
+                name: "Futuristic Metropolis",
+                path: {
+                    name: "CityRoad",
+                    color: "#800080",
+                    effect: "smooth"
+                },
+                wall: {
+                    name: "SkyscraperWall",
+                    color: "#00FF00",
+                    effect: "neon"
+                },
+                entity: {
+                    name: "CityBot",
+                    color: "#FFA500",
+                    effect: "move"
+                }
+            },
+            {
+                name: "Underwater Reef",
+                path: {
+                    name: "CoralPath",
+                    color: "#40E0D0",
+                    effect: "waves"
+                },
+                wall: {
+                    name: "WaterWall",
+                    color: "#000080",
+                    effect: "bubbles"
+                },
+                entity: {
+                    name: "FishDot",
+                    color: "#FF4500",
+                    effect: "swim"
+                }
+            },
+            {
+                name: "Robotic Assembly Line",
+                path: {
+                    name: "ConveyorPath",
+                    color: "#808080",
+                    effect: "move"
+                },
+                wall: {
+                    name: "RobotArmWall",
+                    color: "#FFA500",
+                    effect: "metallic"
+                },
+                entity: {
+                    name: "RobotDot",
+                    color: "#00FF00",
+                    effect: "blink"
+                }
+            },
+            {
+                name: "Galactic Nebula",
+                path: {
+                    name: "NebulaPath",
+                    color: "#800080",
+                    effect: "vortex"
+                },
+                wall: {
+                    name: "StarryWall",
+                    color: "#000000",
+                    effect: "stars"
+                },
+                entity: {
+                    name: "StarshipDot",
+                    color: "#FFFF00",
+                    effect: "flicker"
+                }
+            }
+        ];
+        
+        // Game state
+        let currentStyle = null;
+        let maze = [];
+        let playerPosition = { x: 1, y: 1 };
+        let canvasContext = null;
+        let animationFrameId = null;
+        let effectTime = 0;
+        
+        // Initialize the game
+        function init() {
+            const canvas = document.getElementById('gameCanvas');
+            canvasContext = canvas.getContext('2d');
+            
+            document.getElementById('newGameBtn').addEventListener('click', startNewGame);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', handleKeyPress);
+            
+            startNewGame();
+            gameLoop();
+        }
+        
+        // Start a new game with random style
+        function startNewGame() {
+            // Choose random style
+            const styleIndex = Math.floor(Math.random() * mazeStyles.length);
+            currentStyle = mazeStyles[styleIndex];
+            
+            // Update style name display
+            document.getElementById('styleName').textContent = currentStyle.name;
+            
+            // Generate new maze
+            generateMaze();
+            
+            // Place player at starting position
+            playerPosition = { x: 1, y: 1 };
+        }
+        
+        // Generate a simple maze using a modified DFS algorithm
+        function generateMaze() {
+            // Initialize maze with walls
+            maze = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(1));
+            
+            // Start at 1,1
+            carvePassage(1, 1);
+            
+            // Ensure there's a goal at the bottom right
+            maze[GRID_SIZE - 2][GRID_SIZE - 2] = 0;
+            
+            // Make sure the start position is clear
+            maze[1][1] = 0;
+        }
+        
+        // Carve passages using recursive backtracking
+        function carvePassage(x, y) {
+            // Mark current cell as path
+            maze[y][x] = 0;
+            
+            // Define directions: [dx, dy]
+            const directions = [
+                [0, -2], // North
+                [2, 0],  // East
+                [0, 2],  // South
+                [-2, 0]  // West
+            ];
+            
+            // Shuffle directions for randomness
+            shuffleArray(directions);
+            
+            // Try each direction
+            for (const [dx, dy] of directions) {
+                const newX = x + dx;
+                const newY = y + dy;
+                
+                // Check if the new position is within bounds and is a wall
+                if (newX > 0 && newX < GRID_SIZE - 1 && newY > 0 && newY < GRID_SIZE - 1 && maze[newY][newX] === 1) {
+                    // Carve a passage by setting the cell between current and new to 0
+                    maze[y + dy/2][x + dx/2] = 0;
+                    carvePassage(newX, newY);
+                }
+            }
+        }
+        
+        // Helper function to shuffle array
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        // Handle keyboard input
+        function handleKeyPress(event) {
+            const key = event.key;
+            let newX = playerPosition.x;
+            let newY = playerPosition.y;
+            
+            switch(key) {
+                case 'ArrowUp':
+                    newY--;
+                    break;
+                case 'ArrowDown':
+                    newY++;
+                    break;
+                case 'ArrowLeft':
+                    newX--;
+                    break;
+                case 'ArrowRight':
+                    newX++;
+                    break;
+                default:
+                    return; // Ignore other keys
+            }
+            
+            // Check if the new position is valid (within bounds and not a wall)
+            if (newX >= 0 && newX < GRID_SIZE && newY >= 0 && newY < GRID_SIZE && maze[newY][newX] === 0) {
+                playerPosition.x = newX;
+                playerPosition.y = newY;
+            }
+            
+            // Check if player reached the goal
+            if (newX === GRID_SIZE - 2 && newY === GRID_SIZE - 2) {
+                alert('Congratulations! You found the exit!');
+                startNewGame();
+            }
+        }
+        
+        // Main game loop
+        function gameLoop() {
+            // Update
+            effectTime += 0.016; // Approx 60 FPS
+            
+            // Render
+            render();
+            
+            // Continue the loop
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        // Render the game
+        function render() {
+            // Clear canvas
+            canvasContext.clearRect(0, 0, GRID_SIZE * TILE_SIZE, GRID_SIZE * TILE_SIZE);
+            
+            // Draw maze
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const tileX = x * TILE_SIZE;
+                    const tileY = y * TILE_SIZE;
+                    
+                    if (maze[y][x] === 1) {
+                        // Wall
+                        drawWall(tileX, tileY);
+                    } else {
+                        // Path
+                        drawPath(tileX, tileY);
+                    }
+                }
+            }
+            
+            // Draw player
+            const playerX = playerPosition.x * TILE_SIZE + (TILE_SIZE - ENTITY_SIZE) / 2;
+            const playerY = playerPosition.y * TILE_SIZE + (TILE_SIZE - ENTITY_SIZE) / 2;
+            drawEntity(playerX, playerY);
+            
+            // Draw goal (exit)
+            const goalX = (GRID_SIZE - 2) * TILE_SIZE + (TILE_SIZE - ENTITY_SIZE) / 2;
+            const goalY = (GRID_SIZE - 2) * TILE_SIZE + (TILE_SIZE - ENTITY_SIZE) / 2;
+            drawGoal(goalX, goalY);
+        }
+        
+        // Draw path tile with current style
+        function drawPath(x, y) {
+            canvasContext.save();
+            
+            // Apply path effect
+            applyEffect(currentStyle.path.effect, x, y, TILE_SIZE, TILE_SIZE);
+            
+            // Draw the path
+            canvasContext.fillStyle = currentStyle.path.color;
+            canvasContext.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            
+            // Add details based on style
+            if (currentStyle.path.effect === 'electric') {
+                // Add circuit-like lines
+                canvasContext.strokeStyle = '#FFFFFF';
+                canvasContext.lineWidth = 1;
+                canvasContext.beginPath();
+                canvasContext.moveTo(x + 5, y + 16);
+                canvasContext.lineTo(x + 27, y + 16);
+                canvasContext.stroke();
+                
+                canvasContext.beginPath();
+                canvasContext.moveTo(x + 16, y + 5);
+                canvasContext.lineTo(x + 16, y + 27);
+                canvasContext.stroke();
+            } else if (currentStyle.path.effect === 'waves') {
+                // Add wave pattern
+                canvasContext.strokeStyle = '#FFFFFF33';
+                canvasContext.lineWidth = 1;
+                for (let i = 0; i < TILE_SIZE; i += 4) {
+                    canvasContext.beginPath();
+                    canvasContext.moveTo(x, y + i);
+                    canvasContext.lineTo(x + TILE_SIZE, y + i);
+                    canvasContext.stroke();
+                }
+            }
+            
+            canvasContext.restore();
+        }
+        
+        // Draw wall tile with current style
+        function drawWall(x, y) {
+            canvasContext.save();
+            
+            // Apply wall effect
+            applyEffect(currentStyle.wall.effect, x, y, TILE_SIZE, TILE_SIZE);
+            
+            // Draw the wall
+            canvasContext.fillStyle = currentStyle.wall.color;
+            canvasContext.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            
+            // Add details based on style
+            if (currentStyle.wall.effect === 'pattern') {
+                // Add circuit pattern
+                canvasContext.strokeStyle = '#00FF00';
+                canvasContext.lineWidth = 1;
+                canvasContext.beginPath();
+                canvasContext.moveTo(x + 5, y + 5);
+                canvasContext.lineTo(x + 15, y + 5);
+                canvasContext.lineTo(x + 15, y + 15);
+                canvasContext.lineTo(x + 25, y + 15);
+                canvasContext.lineTo(x + 25, y + 25);
+                canvasContext.stroke();
+            } else if (currentStyle.wall.effect === 'stars') {
+                // Add stars pattern
+                canvasContext.fillStyle = '#FFFFFF';
+                for (let i = 0; i < 5; i++) {
+                    const starX = x + Math.random() * TILE_SIZE;
+                    const starY = y + Math.random() * TILE_SIZE;
+                    const starSize = Math.random() * 2 + 1;
+                    canvasContext.beginPath();
+                    canvasContext.arc(starX, starY, starSize, 0, Math.PI * 2);
+                    canvasContext.fill();
+                }
+            } else if (currentStyle.wall.effect === 'texture') {
+                // Add texture
+                canvasContext.strokeStyle = '#FFFFFF22';
+                canvasContext.lineWidth = 1;
+                for (let i = 0; i < 5; i++) {
+                    const lineX = x + Math.random() * TILE_SIZE;
+                    const lineY = y + Math.random() * TILE_SIZE;
+                    canvasContext.beginPath();
+                    canvasContext.moveTo(lineX, y);
+                    canvasContext.lineTo(lineX, y + TILE_SIZE);
+                    canvasContext.stroke();
+                    
+                    canvasContext.beginPath();
+                    canvasContext.moveTo(x, lineY);
+                    canvasContext.lineTo(x + TILE_SIZE, lineY);
+                    canvasContext.stroke();
+                }
+            }
+            
+            canvasContext.restore();
+        }
+        
+        // Draw player entity with current style
+        function drawEntity(x, y) {
+            canvasContext.save();
+            
+            // Apply entity effect
+            applyEffect(currentStyle.entity.effect, x, y, ENTITY_SIZE, ENTITY_SIZE);
+            
+            // Draw the entity
+            canvasContext.fillStyle = currentStyle.entity.color;
+            canvasContext.beginPath();
+            canvasContext.arc(x + ENTITY_SIZE/2, y + ENTITY_SIZE/2, ENTITY_SIZE/2, 0, Math.PI * 2);
+            canvasContext.fill();
+            
+            canvasContext.restore();
+        }
+        
+        // Draw goal (exit)
+        function drawGoal(x, y) {
+            canvasContext.save();
+            
+            // Draw goal with pulse effect
+            const pulseScale = 1 + Math.sin(effectTime * 4) * 0.2;
+            const size = ENTITY_SIZE * pulseScale;
+            const offsetX = (ENTITY_SIZE - size) / 2;
+            const offsetY = (ENTITY_SIZE - size) / 2;
+            
+            canvasContext.fillStyle = '#FFFFFF';
+            canvasContext.beginPath();
+            canvasContext.arc(x + ENTITY_SIZE/2, y + ENTITY_SIZE/2, size/2, 0, Math.PI * 2);
+            canvasContext.fill();
+            
+            // Add a glow effect
+            canvasContext.shadowColor = '#FFFFFF';
+            canvasContext.shadowBlur = 10;
+            canvasContext.beginPath();
+            canvasContext.arc(x + ENTITY_SIZE/2, y + ENTITY_SIZE/2, size/2 - 2, 0, Math.PI * 2);
+            canvasContext.fill();
+            
+            canvasContext.restore();
+        }
+        
+        // Apply visual effects based on the type
+        function applyEffect(effectType, x, y, width, height) {
+            switch(effectType) {
+                case 'glow':
+                    canvasContext.shadowColor = '#FFFFFF';
+                    canvasContext.shadowBlur = 10;
+                    break;
+                    
+                case 'pulse':
+                    const pulseScale = 1 + Math.sin(effectTime * 4) * 0.2;
+                    const newWidth = width * pulseScale;
+                    const newHeight = height * pulseScale;
+                    const offsetX = (width - newWidth) / 2;
+                    const offsetY = (height - newHeight) / 2;
+                    canvasContext.translate(x + offsetX, y + offsetY);
+                    canvasContext.scale(pulseScale, pulseScale);
+                    canvasContext.translate(-x, -y);
+                    break;
+                    
+                case 'flicker':
+                    canvasContext.globalAlpha = 0.7 + Math.sin(effectTime * 10) * 0.3;
+                    break;
+                    
+                case 'transparency':
+                    canvasContext.globalAlpha = 0.7;
+                    break;
+                    
+                case 'float':
+                    canvasContext.translate(0, Math.sin(effectTime * 3) * 3);
+                    break;
+                    
+                case 'blink':
+                    canvasContext.globalAlpha = (Math.sin(effectTime * 5) > 0) ? 1 : 0.3;
+                    break;
+                    
+                case 'orbit':
+                    // Add a small satellite effect
+                    const orbitX = x + width/2 + Math.cos(effectTime * 3) * (width/2);
+                    const orbitY = y + height/2 + Math.sin(effectTime * 3) * (height/2);
+                    setTimeout(() => {
+                        canvasContext.fillStyle = '#FFFFFF';
+                        canvasContext.beginPath();
+                        canvasContext.arc(orbitX, orbitY, 2, 0, Math.PI * 2);
+                        canvasContext.fill();
+                    }, 0);
+                    break;
+                    
+                case 'vortex':
+                    canvasContext.translate(x + width/2, y + height/2);
+                    canvasContext.rotate(effectTime);
+                    canvasContext.translate(-(x + width/2), -(y + height/2));
+                    break;
+                    
+                case 'sparkle':
+                    // Add occasional sparkles
+                    if (Math.random() > 0.95) {
+                        setTimeout(() => {
+                            const sparkleX = x + Math.random() * width;
+                            const sparkleY = y + Math.random() * height;
+                            canvasContext.fillStyle = '#FFFFFF';
+                            canvasContext.beginPath();
+                            canvasContext.arc(sparkleX, sparkleY, 1, 0, Math.PI * 2);
+                            canvasContext.fill();
+                        }, 0);
+                    }
+                    break;
+                    
+                case 'move':
+                    canvasContext.translate(Math.sin(effectTime * 5) * 2, 0);
+                    break;
+                    
+                case 'swim':
+                    canvasContext.translate(Math.sin(effectTime * 3) * 2, Math.cos(effectTime * 2) * 2);
+                    break;
+                    
+                case 'bubbles':
+                    // Add occasional bubbles
+                    if (Math.random() > 0.9) {
+                        setTimeout(() => {
+                            const bubbleX = x + Math.random() * width;
+                            const bubbleY = y + Math.random() * height;
+                            const bubbleSize = Math.random() * 3 + 1;
+                            canvasContext.fillStyle = '#FFFFFF33';
+                            canvasContext.beginPath();
+                            canvasContext.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
+                            canvasContext.fill();
+                        }, 0);
+                    }
+                    break;
+                    
+                // Default is no effect
+                default:
+                    break;
+            }
+        }
+        
+        // Start the game when the page loads
+        window.onload = init;
+    </script>
+</body>
+</html>
