@@ -12,11 +12,14 @@ const CONFIG = {
     // Получаем токен из переменных окружения
     botToken: process.env.TELEGRAM_BOT_TOKEN,
     
-    // URL вашей игры (по умолчанию)
+    // URL вашей игры (локальный тестовый)
     gameUrl: 'http://localhost:8001',
     
-    // Файл с URL ngrok
+    // Файл с URL ngrok - отключаем, используем локальный URL
     ngrokUrlFile: 'ngrok-url.txt',
+    
+    // Использовать ли ngrok URL
+    useNgrok: false
 };
 
 // ========== ЛОГГИРОВАНИЕ ==========
@@ -35,13 +38,19 @@ function log(message, level = 'info') {
 
 // ========== ПОЛУЧЕНИЕ NGROK URL ==========
 function getNgrokUrl() {
+    // Если отключено использование ngrok, возвращаем локальный URL
+    if (!CONFIG.useNgrok) {
+        log(`Используется локальный URL: ${CONFIG.gameUrl}`, 'info');
+        return CONFIG.gameUrl;
+    }
+    
     try {
         if (fs.existsSync(CONFIG.ngrokUrlFile)) {
             const url = fs.readFileSync(CONFIG.ngrokUrlFile, 'utf8').trim();
             log(`Получен URL из файла: ${url}`, 'success');
             return url;
         } else {
-            log(`Файл ${CONFIG.ngrokUrlFile} не найден`, 'warning');
+            log(`Файл ${CONFIG.ngrokUrlFile} не найден, используется локальный URL`, 'warning');
         }
     } catch (error) {
         log(`Ошибка при чтении файла URL: ${error.message}`, 'error');
@@ -50,7 +59,7 @@ function getNgrokUrl() {
     return CONFIG.gameUrl;
 }
 
-// Получаем HTTPS URL из ngrok
+// Получаем URL для игры
 CONFIG.gameUrl = getNgrokUrl();
 
 // ========== ПРОВЕРКА КОНФИГУРАЦИИ ==========

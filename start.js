@@ -22,6 +22,7 @@ const MODE = args.find(arg => arg.startsWith('--mode='))?.split('=')[1] || 'full
 const CLEAN = args.includes('--clean');
 const HELP = args.includes('--help') || args.includes('-h');
 const VERBOSE = args.includes('--verbose') || args.includes('-v');
+const NO_NGROK = args.includes('--no-ngrok');
 
 // Глобальные переменные для портов и процессов
 global.httpPort = null;
@@ -71,6 +72,7 @@ Snail to Riches - Универсальный скрипт запуска
   --clean          Очистить порты и кэш перед запуском
   --verbose, -v    Подробный вывод логов
   --help, -h       Показать эту справку
+  --no-ngrok       Запуск без ngrok (только локальный сервер)
 
 Режимы:
   full   Запустить все компоненты (по умолчанию)
@@ -281,6 +283,19 @@ async function startServer() {
  * @returns {Promise<object>} Объект с процессом и URL ngrok
  */
 async function startNgrok() {
+    // Если указан флаг NO_NGROK, пропускаем запуск ngrok
+    if (NO_NGROK) {
+        log('Запуск ngrok отключен флагом --no-ngrok', 'info');
+        // Создаем файл с локальным URL
+        fs.writeFileSync(
+            'ngrok-url.txt', 
+            'http://localhost:' + (global.httpPort || 8001),
+            'utf8'
+        );
+        log(`Создан файл с локальным URL: http://localhost:${global.httpPort || 8001}`, 'success');
+        return;
+    }
+    
     log('Запуск ngrok туннеля...', 'start');
     
     try {
