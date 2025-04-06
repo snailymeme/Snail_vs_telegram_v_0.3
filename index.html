@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Snail to Riches</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Прелоадер для фонового изображения -->
+    <link rel="preload" href="images/background.png" as="image">
     <style>
-        /* Стили для canvas и отображения стиля лабиринта */
+        /* Стиль для canvas и отображения стиля лабиринта */
         #maze-container {
             position: relative;
             margin: 0 auto;
@@ -18,20 +20,6 @@
         #maze-canvas {
             display: block;
             background-color: #333;
-        }
-        
-        .maze-style-display {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #fff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: bold;
-            z-index: 10;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
         }
         
         /* Анимации для визуальных эффектов */
@@ -64,7 +52,61 @@
         console.log('HTML document loading...');
         window.addEventListener('DOMContentLoaded', () => {
             console.log('DOM fully loaded');
+            
+            // Проверка на запуск в Telegram
+            if (window.Telegram && window.Telegram.WebApp) {
+                document.body.classList.add('telegram-app');
+                console.log('Running in Telegram WebApp');
+                
+                // Расширяем на полный экран
+                window.Telegram.WebApp.expand();
+                
+                // Адаптируем тему
+                const colorScheme = window.Telegram.WebApp.colorScheme;
+                document.body.setAttribute('data-theme', colorScheme);
+                
+                // Получаем viewport данные для корректного масштабирования
+                const viewportHeight = window.Telegram.WebApp.viewportHeight;
+                const viewportWidth = window.Telegram.WebApp.viewportStableWidth || window.innerWidth;
+                
+                console.log(`Telegram WebApp viewport: ${viewportWidth}x${viewportHeight}`);
+                
+                // Адаптируем отступы в зависимости от размера viewport
+                const mainGame = document.getElementById('main-game');
+                if (mainGame) {
+                    // Корректировка отступа сверху в зависимости от высоты экрана
+                    if (viewportHeight < 600) {
+                        mainGame.style.paddingTop = '240px'; // Для маленьких экранов
+                    } else if (viewportHeight > 800) {
+                        mainGame.style.paddingTop = '320px'; // Для больших экранов
+                    }
+                }
+            }
+            
+            // Явно устанавливаем фоновое изображение через div
+            let bgContainer = document.querySelector('.background-container');
+            if (bgContainer) {
+                bgContainer.style.backgroundImage = "url('images/background.png')";
+                bgContainer.style.backgroundSize = "100% auto";
+                bgContainer.style.backgroundPosition = "top center";
+            }
+            
+            // Дополнительная загрузка через image
+            let bgImage = new Image();
+            bgImage.onload = function() {
+                console.log('Background image loaded successfully');
+                if (bgContainer) {
+                    bgContainer.style.backgroundImage = `url('${bgImage.src}')`;
+                }
+                // Также устанавливаем как резервный вариант для body
+                document.body.style.backgroundImage = `url('${bgImage.src}')`;
+            };
+            bgImage.onerror = function() {
+                console.error('Failed to load background image');
+            };
+            bgImage.src = 'images/background.png';
         });
+        
         window.addEventListener('load', () => {
             console.log('All resources loaded');
         });
@@ -74,6 +116,9 @@
     </script>
 </head>
 <body>
+    <!-- Фоновый контейнер -->
+    <div class="background-container"></div>
+    
     <div class="loader" id="loader">
         <div class="loader-content">
             <h2>Snail to Riches</h2>
@@ -85,15 +130,14 @@
     </div>
 
     <div id="main-game" class="hidden">
-        <header>
-            <h1>Snail to Riches</h1>
-        </header>
+        <header></header>
         
         <div class="game-container">
             <div class="selection-screen" id="selection-screen">
                 <h2>Choose your snail</h2>
                 
                 <div class="snail-selection">
+                    <!-- Верхний ряд - 3 улитки -->
                     <div class="snail-option" data-snail-type="racer">
                         <img src="images/red_snail.png" alt="Racer Snail">
                         <span>Racer</span>
@@ -106,6 +150,11 @@
                         <img src="images/green_snail.png" alt="Snake Snail">
                         <span>Snake</span>
                     </div>
+                    
+                    <!-- Разрыв строки для начала второго ряда -->
+                    <div class="row-break"></div>
+                    
+                    <!-- Нижний ряд - 2 улитки центрированы относительно верхнего ряда -->
                     <div class="snail-option" data-snail-type="stubborn">
                         <img src="images/purple_snail.png" alt="Stubborn Snail">
                         <span>Stubborn</span>
@@ -130,13 +179,7 @@
             
             <div class="game-screen hidden" id="game-screen">
                 <div id="maze-container">
-                    <div class="controls-hint">Используйте колесо мыши для масштабирования, перетаскивайте для перемещения</div>
-                    <div class="zoom-controls">
-                        <button class="zoom-btn" id="zoom-out">-</button>
-                        <button class="zoom-btn" id="zoom-in">+</button>
-                        <button class="zoom-btn" id="zoom-reset">⟲</button>
-                    </div>
-                    <div class="scale-indicator" id="scale-indicator">Масштаб: 100%</div>
+                    <!-- Удаляем все элементы управления и подсказки с игрового поля -->
                 </div>
                 
                 <div class="race-info">
