@@ -48,40 +48,43 @@ class Snail {
      * Инициализация параметров в зависимости от типа улитки
      */
     initTypeSpecificParameters() {
-        // Базовые параметры для всех типов
-        this.wrongPathProbability = 0.7; // Увеличиваем шанс пойти по неправильному пути
+        // Базовые параметры для всех типов (начальные значения)
+        this.wrongPathProbability = 0.7; 
         this.disoriented = false;
         this.disorientedTime = 0;
         this.stuck = false;
         this.turboBoost = false;
         this.turboBoostTimer = 0;
         
-        // Специфичные параметры по типу
+        // Получаем конфигурацию конкретного типа улитки
+        const snailConfig = ASSETS.SNAIL_TYPES[this.type.toUpperCase()];
+        
+        // Специфичные параметры в зависимости от типа
         switch (this.type) {
             case 'racer':
-                this.boostProbability = ASSETS.SNAIL_TYPES.RACER.BOOST_PROBABILITY || 0.2;
-                this.boostMultiplier = ASSETS.SNAIL_TYPES.RACER.BOOST_MULTIPLIER || 1.3;
-                this.wrongPathProbability = 0.5; // Даже быстрая улитка будет ошибаться
+                this.boostProbability = snailConfig.BOOST_PROBABILITY || 0.2;
+                this.boostMultiplier = snailConfig.BOOST_MULTIPLIER || 1.3;
+                this.wrongPathProbability = 0.5; // Базовое значение для типа
                 break;
                 
             case 'explorer':
-                this.explorationRate = ASSETS.SNAIL_TYPES.EXPLORER.EXPLORATION_RATE || 0.85; // Больше исследует
-                this.wrongPathProbability = 0.75; // Сильнее исследует окружение
+                this.explorationRate = snailConfig.EXPLORATION_RATE || 0.85;
+                this.wrongPathProbability = 0.75; // Базовое значение для типа
                 break;
                 
             case 'snake':
-                this.zigzagProbability = ASSETS.SNAIL_TYPES.SNAKE.ZIGZAG_PROBABILITY || 0.9; // Больше зигзагов
-                this.escapeDeadEndSpeed = 1.3; // Быстрее выходит из тупиков
+                this.zigzagProbability = snailConfig.ZIGZAG_PROBABILITY || 0.9;
+                this.escapeDeadEndSpeed = 1.3; // Базовое значение для типа
                 break;
                 
             case 'stubborn':
-                this.forwardProbability = ASSETS.SNAIL_TYPES.STUBBORN.FORWARD_PROBABILITY || 0.9; // Ещё упрямее
-                this.accelerationBoost = 1.1; // Небольшое ускорение при движении вперед
+                this.forwardProbability = snailConfig.FORWARD_PROBABILITY || 0.9;
+                this.accelerationBoost = 1.1; // Базовое значение для типа
                 break;
                 
             case 'deadender':
-                this.randomTurnProbability = ASSETS.SNAIL_TYPES.DEADENDER.RANDOM_TURN_PROBABILITY || 0.8; // Больше случайных поворотов
-                this.pauseInDeadEndTime = 1500; // Дольше думает в тупике (мс)
+                this.randomTurnProbability = snailConfig.RANDOM_TURN_PROBABILITY || 0.8;
+                this.pauseInDeadEndTime = 1500; // Базовое значение для типа
                 break;
         }
     }
@@ -103,12 +106,26 @@ class Snail {
         this.element.style.width = `${elementSize}px`;
         this.element.style.height = `${elementSize}px`;
         
-        // Добавляем плавное перемещение и стили для улучшения внешнего вида
-        this.element.style.transition = 'left 0.5s ease-in-out, top 0.5s ease-in-out, transform 0.3s ease-in-out';
+        // Улучшенная плавная анимация с использованием cubic-bezier для более естественного движения
+        this.element.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
         this.element.style.position = 'absolute';
         this.element.style.borderRadius = '50%';
         this.element.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
-        this.element.style.willChange = 'transform, left, top';
+        this.element.style.willChange = 'transform'; // Оптимизация производительности
+        this.element.style.zIndex = '10';
+        
+        // Добавляем след улитки для визуального эффекта
+        this.trailElement = document.createElement('div');
+        this.trailElement.className = `snail-trail snail-trail-${this.type}`;
+        this.trailElement.style.position = 'absolute';
+        this.trailElement.style.width = `${elementSize/5}px`;
+        this.trailElement.style.height = `${elementSize/5}px`;
+        this.trailElement.style.borderRadius = '50%';
+        this.trailElement.style.opacity = '0.4';
+        this.trailElement.style.backgroundColor = this.color;
+        this.trailElement.style.zIndex = '5';
+        this.trailElement.style.pointerEvents = 'none';
+        container.appendChild(this.trailElement);
         
         // Создаем изображение улитки
         const snailImage = document.createElement('img');
@@ -122,11 +139,130 @@ class Snail {
         // Добавляем изображение в элемент
         this.element.appendChild(snailImage);
         
-        // Устанавливаем позицию
+        // Устанавливаем начальную позицию
+        this.displayX = this.col * this.cellSize;
+        this.displayY = this.row * this.cellSize;
         this.updateElementPosition();
         
         // Добавляем элемент в контейнер
         container.appendChild(this.element);
+        
+        // Эффект появления
+        this.element.style.opacity = '0';
+        this.element.style.transform = 'scale(0.5)';
+        
+        setTimeout(() => {
+            this.element.style.opacity = '1';
+            this.element.style.transform = 'scale(1)';
+        }, 10);
+        
+        // Запускаем анимационный цикл для улитки
+        this.animationFrameId = requestAnimationFrame(this.animationFrame.bind(this));
+    }
+    
+    /**
+     * Функция анимационного цикла для плавного движения
+     */
+    animationFrame() {
+        if (this.isMoving && !this.hasFinished) {
+            // Вычисляем целевую позицию
+            const targetX = this.col * this.cellSize;
+            const targetY = this.row * this.cellSize;
+            
+            // Плавно приближаем текущее отображаемое положение к целевому
+            const smoothFactor = 0.15; // Фактор плавности (0-1)
+            this.displayX += (targetX - this.displayX) * smoothFactor;
+            this.displayY += (targetY - this.displayY) * smoothFactor;
+            
+            // Обновляем визуальную позицию элемента
+            this.updateVisualPosition();
+            
+            // Добавляем эффект следа
+            this.updateTrail();
+        }
+        
+        // Запрашиваем следующий кадр анимации
+        this.animationFrameId = requestAnimationFrame(this.animationFrame.bind(this));
+    }
+    
+    /**
+     * Обновление визуальной позиции элемента
+     */
+    updateVisualPosition() {
+        if (!this.element) return;
+        
+        // Центрирование улитки в ячейке
+        const elementSize = parseFloat(this.element.style.width);
+        const offset = (this.cellSize - elementSize) / 2;
+        
+        // Применяем дополнительные эффекты к движению
+        let bounceEffect = 0;
+        if (this.isMoving) {
+            // Эффект "покачивания" при движении
+            bounceEffect = Math.sin(Date.now() / 100) * 2;
+        }
+        
+        // Применяем позицию через трансформацию для плавности
+        const x = this.displayX + offset;
+        const y = this.displayY + offset + bounceEffect;
+        
+        this.element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        
+        // Эффект отражения в зависимости от направления
+        const snailImage = this.element.querySelector('img');
+        if (snailImage) {
+            const isFlipped = this.currentDirection === 'left';
+            const rotation = isFlipped ? 'scaleX(-1)' : '';
+            
+            // Добавляем небольшой наклон при движении в разных направлениях
+            let tilt = 0;
+            if (this.currentDirection === 'up') tilt = -10;
+            else if (this.currentDirection === 'down') tilt = 10;
+            
+            snailImage.style.transform = `${rotation} rotate(${tilt}deg)`;
+        }
+    }
+    
+    /**
+     * Обновление следа улитки
+     */
+    updateTrail() {
+        if (!this.trailElement || !this.isMoving) return;
+        
+        // Случайное добавление "капель" следа
+        if (Math.random() < 0.2) {
+            const trailDrop = document.createElement('div');
+            trailDrop.className = 'trail-drop';
+            trailDrop.style.position = 'absolute';
+            trailDrop.style.width = '4px';
+            trailDrop.style.height = '4px';
+            trailDrop.style.borderRadius = '50%';
+            trailDrop.style.backgroundColor = this.color;
+            trailDrop.style.opacity = '0.3';
+            trailDrop.style.zIndex = '4';
+            
+            // Размещаем каплю в текущей позиции улитки
+            const x = this.displayX + this.cellSize / 2;
+            const y = this.displayY + this.cellSize / 2;
+            trailDrop.style.left = `${x}px`;
+            trailDrop.style.top = `${y}px`;
+            
+            // Добавляем к DOM
+            this.element.parentNode.appendChild(trailDrop);
+            
+            // Анимация исчезновения и удаление через 2 секунды
+            setTimeout(() => {
+                trailDrop.style.transition = 'opacity 1s';
+                trailDrop.style.opacity = '0';
+                setTimeout(() => {
+                    trailDrop.remove();
+                }, 1000);
+            }, 1000);
+        }
+        
+        // Обновляем позицию основного следа
+        this.trailElement.style.left = `${this.displayX + this.cellSize / 2}px`;
+        this.trailElement.style.top = `${this.displayY + this.cellSize / 2}px`;
     }
     
     /**
@@ -135,33 +271,12 @@ class Snail {
     updateElementPosition() {
         if (!this.element) return;
         
-        const x = this.col * this.cellSize;
-        const y = this.row * this.cellSize;
+        // Обновляем целевую позицию
+        this.displayX = this.col * this.cellSize;
+        this.displayY = this.row * this.cellSize;
         
-        // Центрирование улитки в ячейке
-        const offset = (this.cellSize - parseFloat(this.element.style.width)) / 2;
-        
-        // Применяем позицию через трансформацию для большей плавности
-        this.element.style.left = `${x + offset}px`;
-        this.element.style.top = `${y + offset}px`;
-        
-        // Меняем только отражение по горизонтали в зависимости от направления
-        let scaleX = 1; // По умолчанию без отражения
-        
-        // Теперь улитка не поворачивается, а только отражается при движении влево
-        if (this.currentDirection === 'left') {
-            scaleX = -1; // Отражаем по горизонтали
-        }
-        
-        // Получаем потомка-изображение
-        const snailImage = this.element.querySelector('img');
-        if (snailImage) {
-            // Применяем только горизонтальное отражение при движении влево
-            snailImage.style.transform = scaleX === -1 ? 'scaleX(-1)' : '';
-        } else {
-            // Запасной вариант, если img не найден
-            this.element.style.transform = `scaleX(${scaleX})`;
-        }
+        // Обновляем визуальное положение
+        this.updateVisualPosition();
     }
     
     /**
@@ -562,6 +677,19 @@ class Snail {
         this.isMoving = false;
         this.position = position;
         this.finishTime = Date.now() - this.lastMoveTime;
+        
+        // Добавляем эффект для финиша
+        if (this.element) {
+            // Добавляем класс для winner анимации
+            if (position === 1) {
+                this.element.classList.add('winner');
+            }
+            
+            this.element.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.5s ease';
+            this.element.style.filter = 'drop-shadow(0 0 10px gold) brightness(1.3)';
+            this.element.style.transform = `translate3d(${this.displayX + (this.cellSize - parseFloat(this.element.style.width)) / 2}px, ${this.displayY + (this.cellSize - parseFloat(this.element.style.height)) / 2}px, 0) scale(1.2)`;
+        }
+        
         console.log(`${this.name} финишировал на позиции ${position}! Время: ${this.finishTime}мс`);
     }
     
@@ -584,8 +712,25 @@ class Snail {
         this.disorientedTime = 0;
         this.stuck = false;
         
+        // Сбрасываем отображаемые координаты
+        this.displayX = this.col * this.cellSize;
+        this.displayY = this.row * this.cellSize;
+        
         // Обновляем позицию элемента
         this.updateElementPosition();
+        
+        // Удаляем все следы
+        if (this.element && this.element.parentNode) {
+            const trailDrops = this.element.parentNode.querySelectorAll('.trail-drop');
+            trailDrops.forEach(drop => drop.remove());
+        }
+        
+        // Сбрасываем стили и классы анимаций
+        if (this.element) {
+            this.element.classList.remove('turbo-boost', 'stuck', 'disoriented', 'winner');
+            this.element.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
+            this.element.style.transform = `translate3d(${this.displayX + (this.cellSize - parseFloat(this.element.style.width)) / 2}px, ${this.displayY + (this.cellSize - parseFloat(this.element.style.height)) / 2}px, 0) scale(1)`;
+        }
     }
     
     /**
@@ -620,6 +765,15 @@ class Snail {
             this.turboBoostTimer -= deltaTime;
             if (this.turboBoostTimer <= 0) {
                 this.turboBoost = false;
+                // Удаляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.remove('turbo-boost');
+                }
+            } else {
+                // Добавляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.add('turbo-boost');
+                }
             }
         }
         
@@ -628,6 +782,28 @@ class Snail {
             this.disorientedTime -= deltaTime;
             if (this.disorientedTime <= 0) {
                 this.disoriented = false;
+                // Удаляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.remove('disoriented');
+                }
+            } else {
+                // Добавляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.add('disoriented');
+                }
+            }
+        }
+        
+        // Обновляем состояние застревания
+        if (this.stuck) {
+            // Добавляем класс для CSS анимации
+            if (this.element) {
+                this.element.classList.add('stuck');
+            }
+        } else {
+            // Удаляем класс для CSS анимации
+            if (this.element) {
+                this.element.classList.remove('stuck');
             }
         }
     }

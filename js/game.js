@@ -259,19 +259,37 @@ class Game {
      * Инициализация обработчиков событий
      */
     initEventListeners() {
-        // Выбор улитки
+        // Обработчики для экрана выбора улитки
         this.snailOptions.forEach(option => {
             option.addEventListener('click', () => {
-                this.selectSnail(option.dataset.snailType);
+                // Удаляем класс selected со всех улиток
+                this.snailOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // Добавляем класс selected к выбранной улитке
+                option.classList.add('selected');
+                
+                // Запоминаем выбранный тип улитки
+                this.selectedSnailType = option.dataset.snailType;
+                
+                console.log(`Выбрана улитка типа: ${this.selectedSnailType}`);
             });
         });
         
-        // Изменение ставки
-        this.betAmount.addEventListener('change', () => {
-            this.setBet(parseInt(this.betAmount.value, 10));
+        // Обработчик изменения ставки
+        this.betAmount.addEventListener('input', () => {
+            const value = parseInt(this.betAmount.value);
+            
+            // Проверка валидности значения
+            if (isNaN(value) || value < ASSETS.GAME.MIN_BET) {
+                this.setBet(ASSETS.GAME.MIN_BET);
+            } else if (value > Math.min(ASSETS.GAME.MAX_BET, this.balance)) {
+                this.setBet(Math.min(ASSETS.GAME.MAX_BET, this.balance));
+            } else {
+                this.setBet(value);
+            }
         });
         
-        // Кнопки управления
+        // Обработчик кнопки начала гонки
         this.startRaceButton.addEventListener('click', () => {
             this.startRace();
         });
@@ -341,23 +359,6 @@ class Game {
                 }, 500);
             }
         );
-    }
-    
-    /**
-     * Выбор улитки
-     */
-    selectSnail(type) {
-        // Снимаем выделение со всех улиток
-        this.snailOptions.forEach(option => {
-            option.classList.remove('selected');
-        });
-        
-        // Выделяем выбранную улитку
-        const selectedOption = document.querySelector(`.snail-option[data-snail-type="${type}"]`);
-        if (selectedOption) {
-            selectedOption.classList.add('selected');
-            this.selectedSnailType = type;
-        }
     }
     
     /**
@@ -463,6 +464,9 @@ class Game {
             alert('Недостаточно средств для ставки!');
             return;
         }
+        
+        // Перед началом гонки рандомно распределяем характеристики улиток
+        this.randomizeSnailAbilities();
         
         // Списываем ставку с баланса
         this.balance -= this.bet;
@@ -925,5 +929,91 @@ class Game {
         if (elapsed >= ASSETS.GAME.RACE_DURATION_MS) {
             this.endRace();
         }
+    }
+    
+    /**
+     * Рандомно распределяет характеристики улиток перед началом гонки
+     */
+    randomizeSnailAbilities() {
+        console.log("Рандомизируем характеристики улиток...");
+        
+        // Получаем все типы улиток
+        const snailTypes = Object.keys(ASSETS.SNAIL_TYPES).map(key => ASSETS.SNAIL_TYPES[key].TYPE);
+        
+        // Создаем копию оригинальных характеристик, если мы еще ее не создали
+        if (!this.originalSnailCharacteristics) {
+            this.originalSnailCharacteristics = {};
+            
+            for (const key in ASSETS.SNAIL_TYPES) {
+                this.originalSnailCharacteristics[key] = { ...ASSETS.SNAIL_TYPES[key] };
+            }
+        }
+        
+        // Создаем массив характеристик
+        const characteristics = [];
+        for (const key in this.originalSnailCharacteristics) {
+            // Копируем только характеристики, но не тип и имя
+            const snailCharacteristics = {
+                BASE_SPEED: this.originalSnailCharacteristics[key].BASE_SPEED,
+                SPEED_VARIATION: this.originalSnailCharacteristics[key].SPEED_VARIATION,
+                COLOR: this.originalSnailCharacteristics[key].COLOR
+            };
+            
+            // Добавляем специфичные для типа улитки характеристики
+            switch (this.originalSnailCharacteristics[key].TYPE) {
+                case 'racer':
+                    snailCharacteristics.BOOST_PROBABILITY = this.originalSnailCharacteristics[key].BOOST_PROBABILITY;
+                    snailCharacteristics.BOOST_MULTIPLIER = this.originalSnailCharacteristics[key].BOOST_MULTIPLIER;
+                    break;
+                case 'explorer':
+                    snailCharacteristics.EXPLORATION_RATE = this.originalSnailCharacteristics[key].EXPLORATION_RATE;
+                    break;
+                case 'snake':
+                    snailCharacteristics.ZIGZAG_PROBABILITY = this.originalSnailCharacteristics[key].ZIGZAG_PROBABILITY;
+                    break;
+                case 'stubborn':
+                    snailCharacteristics.FORWARD_PROBABILITY = this.originalSnailCharacteristics[key].FORWARD_PROBABILITY;
+                    break;
+                case 'deadender':
+                    snailCharacteristics.RANDOM_TURN_PROBABILITY = this.originalSnailCharacteristics[key].RANDOM_TURN_PROBABILITY;
+                    break;
+            }
+            
+            characteristics.push(snailCharacteristics);
+        }
+        
+        // Перемешиваем характеристики
+        this.shuffleArray(characteristics);
+        
+        // Применяем перемешанные характеристики к улиткам, сохраняя их тип и имя
+        let i = 0;
+        for (const key in ASSETS.SNAIL_TYPES) {
+            ASSETS.SNAIL_TYPES[key] = {
+                ...ASSETS.SNAIL_TYPES[key],
+                ...characteristics[i]
+            };
+            
+            // Сохраняем тип и имя оригинальной улитки
+            ASSETS.SNAIL_TYPES[key].TYPE = this.originalSnailCharacteristics[key].TYPE;
+            ASSETS.SNAIL_TYPES[key].NAME = this.originalSnailCharacteristics[key].NAME;
+            ASSETS.SNAIL_TYPES[key].DESCRIPTION = this.originalSnailCharacteristics[key].DESCRIPTION;
+            
+            i++;
+        }
+        
+        // Выводим в консоль новые характеристики для отладки
+        console.log("Новые характеристики улиток:", ASSETS.SNAIL_TYPES);
+    }
+    
+    /**
+     * Перемешивает массив случайным образом (алгоритм Фишера-Йейтса)
+     * @param {Array} array - массив для перемешивания
+     */
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 } 
