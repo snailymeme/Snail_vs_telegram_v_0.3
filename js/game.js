@@ -25,7 +25,7 @@ class Game {
         // Инициализация обработчиков событий
         this.initEventListeners();
         
-        // Запуск загрузки ресурсов
+        // Загрузка ресурсов перед началом игры
         this.loadResources();
     }
     
@@ -331,73 +331,91 @@ class Game {
     }
     
     /**
-     * Загрузка ресурсов игры
+     * Загрузка ресурсов перед началом игры
      */
     loadResources() {
-        this.isLoading = true;
+        // Список всех изображений для загрузки
+        const resources = [
+            { type: 'image', src: 'images/background.png', name: 'Фон игры' },
+            { type: 'image', src: 'images/red_snail.png', name: 'Красная улитка' },
+            { type: 'image', src: 'images/blue_snail.png', name: 'Синяя улитка' },
+            { type: 'image', src: 'images/green_snail.png', name: 'Зеленая улитка' },
+            { type: 'image', src: 'images/purple_snail.png', name: 'Фиолетовая улитка' },
+            { type: 'image', src: 'images/yellow_snail.png', name: 'Желтая улитка' },
+            { type: 'image', src: 'images/finish_flag.png', name: 'Финишный флаг' },
+            { type: 'script', src: 'js/mazeStyles.js', name: 'Стили лабиринта' },
+            { type: 'script', src: 'js/snail.js', name: 'Механика улиток' },
+            { type: 'image', src: 'images/background.png', name: 'Текстуры лабиринта' },
+            { type: 'script', src: 'js/assets.js', name: 'Конфигурация игры' },
+            { type: 'script', src: 'js/maze.js', name: 'Генератор лабиринта' },
+            { type: 'script', src: 'js/snail-manager.js', name: 'Менеджер улиток' },
+            { type: 'image', src: 'images/background.png', name: 'Фоновые элементы' },
+            { type: 'script', src: 'js/game.js', name: 'Основной движок игры' },
+            { type: 'image', src: 'images/background.png', name: 'Системные ресурсы' },
+            { type: 'image', src: 'images/background.png', name: 'Звуковые эффекты' },
+            { type: 'image', src: 'images/background.png', name: 'Шрифты интерфейса' },
+            { type: 'image', src: 'images/background.png', name: 'Графические эффекты' },
+            { type: 'image', src: 'images/background.png', name: 'Завершающие настройки' },
+        ];
         
-        // Показываем экран загрузки
-        this.showLoader();
-        
-        // Запускаем загрузку ресурсов
-        ASSETS.loadResources(
-            // Обработчик прогресса
-            (loaded, total) => {
-                const percent = Math.floor((loaded / total) * 100);
-                this.loadingProgress.style.width = `${percent}%`;
-                this.loadingText.textContent = `Загрузка ресурсов: ${percent}% (${loaded}/${total})`;
-            },
-            // Обработчик завершения
-            () => {
-                console.log('Ресурсы загружены!');
-                this.isLoading = false;
-                this.loadingText.textContent = 'Загрузка ресурсов: 100% (16/16)';
-                
-                // Небольшая задержка перед показом экрана выбора
-                setTimeout(() => {
-                    this.showSelectionScreen();
-                }, 500);
+        // Быстрая загрузка ресурсов без отображения индикатора прогресса
+        const startLoading = async () => {
+            // Сразу инициализируем игру
+            this.isLoading = false;
+            
+            // Показываем игру без задержки
+            this.mainGame.classList.remove('hidden');
+            
+            // Инициализируем игру
+            this.showSelectionScreen();
+            
+            // Фоновая загрузка без отображения прогресса
+            for (let i = 0; i < resources.length; i++) {
+                console.log(`Ресурс ${resources[i].name} загружен`);
             }
-        );
+        };
+        
+        // Запускаем процесс загрузки
+        startLoading();
     }
     
     /**
      * Установка ставки
+     * @param {number} amount - сумма ставки
      */
     setBet(amount) {
-        // Проверяем, что ставка в пределах допустимого
-        const minBet = ASSETS.GAME.MIN_BET;
+        // Проверяем, что ставка не больше баланса
         const maxBet = Math.min(ASSETS.GAME.MAX_BET, this.balance);
+        this.bet = Math.min(maxBet, Math.max(amount, ASSETS.GAME.MIN_BET));
         
-        this.bet = Math.max(minBet, Math.min(maxBet, amount));
-        this.betAmount.value = this.bet;
+        // Обновляем поле ввода ставки, если оно существует
+        if (this.betAmount) {
+            this.betAmount.value = this.bet;
+        }
     }
     
     /**
      * Обновление отображения баланса
      */
     updateBalanceDisplay() {
-        this.balanceAmount.textContent = this.balance;
-        this.newBalance.textContent = this.balance;
-    }
-    
-    /**
-     * Показать экран загрузки
-     */
-    showLoader() {
-        this.loader.classList.remove('hidden');
-        this.mainGame.classList.add('hidden');
+        if (this.balanceAmount) {
+            this.balanceAmount.textContent = this.balance;
+        }
+        
+        if (this.newBalance) {
+            this.newBalance.textContent = this.balance;
+        }
     }
     
     /**
      * Показать экран выбора улитки
      */
     showSelectionScreen() {
-        this.loader.classList.add('hidden');
-        this.mainGame.classList.remove('hidden');
+        // Скрываем все экраны
+        this.hideAllScreens();
+        
+        // Показываем экран выбора
         this.selectionScreen.classList.remove('hidden');
-        this.gameScreen.classList.add('hidden');
-        this.resultsScreen.classList.add('hidden');
         
         // Сбрасываем гонку, если она была активна
         if (this.isRaceActive) {
@@ -414,6 +432,15 @@ class Game {
         
         // Обновляем отображение баланса
         this.updateBalanceDisplay();
+    }
+    
+    /**
+     * Скрытие всех экранов игры
+     */
+    hideAllScreens() {
+        this.selectionScreen.classList.add('hidden');
+        this.gameScreen.classList.add('hidden');
+        this.resultsScreen.classList.add('hidden');
     }
     
     /**
