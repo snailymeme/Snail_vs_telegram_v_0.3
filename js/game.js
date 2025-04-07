@@ -500,23 +500,94 @@ class Game {
         // Обновляем отображение ставки
         this.currentBetDisplay.textContent = this.bet;
         
-        // Устанавливаем таймер гонки
-        this.raceStartTime = Date.now();
-        this.isRaceActive = true;
+        // Создаем аудио для обратного отсчета
+        const raceStartSound = new Audio('mp3/race_start.mp3');
         
-        // Запускаем гонку улиток
-        this.snailManager.startRace();
+        // Создаем элемент для отображения обратного отсчета
+        const countdownEl = document.createElement('div');
+        countdownEl.className = 'countdown';
+        countdownEl.style.position = 'absolute';
+        countdownEl.style.top = '50%';
+        countdownEl.style.left = '50%';
+        countdownEl.style.transform = 'translate(-50%, -50%)';
+        countdownEl.style.fontSize = '120px';
+        countdownEl.style.fontWeight = 'bold';
+        countdownEl.style.color = '#FECD51';
+        countdownEl.style.textShadow = '0 0 10px rgba(100,50,0,0.7), 4px 4px 0 #8B5927';
+        countdownEl.style.fontFamily = 'Arial Rounded MT Bold, Arial, sans-serif';
+        countdownEl.style.zIndex = '1000';
+        countdownEl.style.opacity = '0';
+        countdownEl.style.transition = 'transform 0.5s, opacity 0.5s';
+        this.gameScreen.appendChild(countdownEl);
         
-        // Устанавливаем статус гонки
-        this.raceStatusDisplay.textContent = 'Гонка началась!';
+        // Функция для анимации цифр обратного отсчета
+        const animateNumber = (number, isStart = false) => {
+            countdownEl.style.opacity = '0';
+            countdownEl.style.transform = 'translate(-50%, -50%) scale(0.5)';
+            
+            setTimeout(() => {
+                countdownEl.textContent = number;
+                
+                // Если это надпись START, меняем размер шрифта
+                if (isStart) {
+                    countdownEl.style.fontSize = '80px';
+                } else {
+                    countdownEl.style.fontSize = '120px';
+                }
+                
+                countdownEl.style.opacity = '1';
+                countdownEl.style.transform = 'translate(-50%, -50%) scale(1.2)';
+                
+                setTimeout(() => {
+                    countdownEl.style.opacity = '0';
+                    countdownEl.style.transform = 'translate(-50%, -50%) scale(0.8)';
+                }, 800);
+            }, 200);
+        };
         
-        // Устанавливаем таймер для автоматического завершения гонки
-        this.raceTimeout = setTimeout(() => {
-            if (this.isRaceActive) {
-                console.log('Время гонки истекло, принудительное завершение');
-                this.forceEndRace();
-            }
-        }, ASSETS.GAME.RACE_DURATION_MS);
+        // Запускаем обратный отсчет
+        animateNumber('3');
+        
+        // Воспроизводим звук обратного отсчета
+        raceStartSound.play();
+        
+        // Через 1 секунду показываем 2
+        setTimeout(() => {
+            animateNumber('2');
+        }, 1000);
+        
+        // Через 2 секунды показываем 1
+        setTimeout(() => {
+            animateNumber('1');
+        }, 2000);
+        
+        // Через 3 секунды показываем START и запускаем гонку
+        setTimeout(() => {
+            animateNumber('START!', true);
+            
+            // Устанавливаем таймер гонки
+            this.raceStartTime = Date.now();
+            this.isRaceActive = true;
+            
+            // Запускаем гонку улиток
+            this.snailManager.startRace();
+            
+            // Устанавливаем статус гонки
+            this.raceStatusDisplay.textContent = 'Гонка началась!';
+            
+            // Устанавливаем таймер для автоматического завершения гонки
+            this.raceTimeout = setTimeout(() => {
+                if (this.isRaceActive) {
+                    console.log('Время гонки истекло, принудительное завершение');
+                    this.forceEndRace();
+                }
+            }, ASSETS.GAME.RACE_DURATION_MS);
+            
+            // Удаляем элемент обратного отсчета после завершения
+            setTimeout(() => {
+                this.gameScreen.removeChild(countdownEl);
+            }, 1000);
+        }, 3000);
     }
     
     /**
