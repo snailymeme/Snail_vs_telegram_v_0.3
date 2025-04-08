@@ -566,58 +566,31 @@ class Game {
     }
     
     /**
-     * Запуск гонки
+     * Старт гонки
      */
     startRace() {
+        if (this.isRaceActive) return;
+        
         // Проверяем, выбрана ли улитка
         if (!this.selectedSnailType) {
-            alert('Пожалуйста, выберите улитку!');
+            alert('Пожалуйста, выберите улитку перед началом гонки');
             return;
         }
         
-        // Проверяем, достаточно ли средств для ставки
-        if (this.balance < this.bet) {
-            alert('Недостаточно средств для ставки!');
+        // Проверяем валидность ставки
+        if (this.bet <= 0 || this.bet > this.balance) {
+            alert('Пожалуйста, введите корректную ставку');
             return;
         }
+        
+        // Обновляем состояние игры
+        this.isRaceActive = true;
+        this.raceStartTime = Date.now();
+        this.elapsedTime = 0;
         
         // Вычитаем ставку из баланса
         this.balance -= this.bet;
-        
-        // Обновляем отображение баланса
         this.updateBalanceDisplay();
-        
-        // Показываем игровой экран
-        this.showGameScreen();
-        
-        // Создаем новый лабиринт, используя увеличенные размеры
-        const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
-        const rows = mazeConfig.ROWS + 5; // Добавляем +5 рядов
-        const cols = mazeConfig.COLS + 5; // Добавляем +5 колонок
-        
-        // Рандомизируем характеристики улиток перед гонкой
-        this.randomizeSnailAbilities();
-        
-        // Создаем экземпляр генератора лабиринта
-        const mazeGenerator = new MazeGenerator(rows, cols, this.difficulty);
-        
-        // Генерируем новый лабиринт
-        const mazeData = mazeGenerator.generate();
-        
-        // Создаем экземпляр лабиринта
-        this.maze = new Maze(mazeData.grid, mazeData.start, mazeData.finish);
-        
-        // Создаем менеджер улиток
-        this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
-        
-        // Устанавливаем начальное смещение для центрирования лабиринта
-        const cellSize = ASSETS.CELL_SIZE;
-        this.scale = 1.0; // Увеличиваем начальный масштаб для лучшей видимости
-        this.offsetX = (this.canvas.width / 2) - (cols * cellSize * this.scale / 2);
-        this.offsetY = (this.canvas.height / 2) - (rows * cellSize * this.scale / 2);
-        
-        // Отрисовываем лабиринт
-        this.drawMaze();
         
         // Обновляем отображение ставки
         this.currentBetDisplay.textContent = this.bet;
@@ -625,88 +598,163 @@ class Game {
         // Воспроизводим звук начала гонки
         this.playSound(ASSETS.SOUNDS.RACE_START);
         
-        // Создаем элемент для отображения обратного отсчета
-        const countdownEl = document.createElement('div');
-        countdownEl.className = 'countdown';
-        countdownEl.style.position = 'absolute';
-        countdownEl.style.top = '50%';
-        countdownEl.style.left = '50%';
-        countdownEl.style.transform = 'translate(-50%, -50%)';
-        countdownEl.style.fontSize = '120px';
-        countdownEl.style.fontWeight = 'bold';
-        countdownEl.style.color = '#FF9900';
-        countdownEl.style.textShadow = '0 0 15px rgba(255,153,0,0.7), 3px 3px 0 #CC6600';
-        countdownEl.style.fontFamily = 'Impact, Haettenschweiler, Arial Narrow Bold, sans-serif';
-        countdownEl.style.zIndex = '1000';
-        countdownEl.style.opacity = '0';
-        countdownEl.style.transition = 'transform 0.5s, opacity 0.5s';
-        this.gameScreen.appendChild(countdownEl);
+        // Отображаем экран игры
+        this.showGameScreen();
         
-        // Функция для анимации цифр обратного отсчета
+        // Сбрасываем масштаб к исходному состоянию
+        this.resetZoom();
+        
+        // Создаем новый лабиринт
+        const difficulty = this.difficulty || 'medium';
+        console.log(`Создание лабиринта (сложность: ${difficulty})...`);
+        
+        // Получаем настройки лабиринта из ASSETS
+        const mazeConfig = ASSETS.MAZE[difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
+        console.log('Конфигурация лабиринта:', mazeConfig);
+        
+        // Создаем новый лабиринт
+        this.maze = new Maze(difficulty);
+        console.log('Лабиринт создан:', this.maze);
+        
+        // Создаем менеджер улиток
+        this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
+        console.log('Менеджер улиток создан:', this.snailManager);
+        
+        // Отрисовываем лабиринт
+        this.drawMaze();
+        
+        // Добавляем анимацию обратного отсчета перед началом гонки
+        let countdownValue = 3;
+        
         const animateNumber = (number, isStart = false) => {
-            countdownEl.style.opacity = '0';
-            countdownEl.style.transform = 'translate(-50%, -50%) scale(0.5)';
-            
-            setTimeout(() => {
-                countdownEl.textContent = number;
+            // Создаем элемент счетчика, если это начало
+            if (isStart) {
+                const countdownOverlay = document.createElement('div');
+                countdownOverlay.id = 'countdown-overlay';
+                countdownOverlay.style.position = 'absolute';
+                countdownOverlay.style.top = '0';
+                countdownOverlay.style.left = '0';
+                countdownOverlay.style.width = '100%';
+                countdownOverlay.style.height = '100%';
+                countdownOverlay.style.display = 'flex';
+                countdownOverlay.style.justifyContent = 'center';
+                countdownOverlay.style.alignItems = 'center';
+                countdownOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                countdownOverlay.style.color = 'white';
+                countdownOverlay.style.fontSize = '72px';
+                countdownOverlay.style.fontWeight = 'bold';
+                countdownOverlay.style.zIndex = '1000';
+                countdownOverlay.textContent = number;
                 
-                // Если это надпись START, меняем размер шрифта
-                if (isStart) {
-                    countdownEl.style.fontSize = '60px';
-                } else {
-                    countdownEl.style.fontSize = '120px';
-                }
+                // Добавляем счетчик в контейнер лабиринта
+                this.mazeContainer.appendChild(countdownOverlay);
                 
-                countdownEl.style.opacity = '1';
-                countdownEl.style.transform = 'translate(-50%, -50%) scale(1.2)';
+                // Добавляем анимацию
+                countdownOverlay.animate([
+                    { opacity: 0, transform: 'scale(0.5)' },
+                    { opacity: 1, transform: 'scale(1.2)' },
+                    { opacity: 1, transform: 'scale(1)' },
+                    { opacity: 0, transform: 'scale(3)' }
+                ], {
+                    duration: 1000,
+                    easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                });
                 
+                // Следующее число или запуск гонки
                 setTimeout(() => {
-                    countdownEl.style.opacity = '0';
-                    countdownEl.style.transform = 'translate(-50%, -50%) scale(0.8)';
-                }, 800);
-            }, 200);
+                    // Удаляем элемент счетчика
+                    countdownOverlay.remove();
+                    
+                    if (number > 1) {
+                        // Анимируем следующее число
+                        animateNumber(number - 1);
+                    } else {
+                        // Запускаем гонку
+                        this.launchRace();
+                    }
+                }, 1000);
+            } else {
+                // Создаем новый элемент счетчика
+                const countdownOverlay = document.createElement('div');
+                countdownOverlay.id = 'countdown-overlay';
+                countdownOverlay.style.position = 'absolute';
+                countdownOverlay.style.top = '0';
+                countdownOverlay.style.left = '0';
+                countdownOverlay.style.width = '100%';
+                countdownOverlay.style.height = '100%';
+                countdownOverlay.style.display = 'flex';
+                countdownOverlay.style.justifyContent = 'center';
+                countdownOverlay.style.alignItems = 'center';
+                countdownOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                countdownOverlay.style.color = 'white';
+                countdownOverlay.style.fontSize = '72px';
+                countdownOverlay.style.fontWeight = 'bold';
+                countdownOverlay.style.zIndex = '1000';
+                countdownOverlay.textContent = number;
+                
+                // Добавляем счетчик в контейнер лабиринта
+                this.mazeContainer.appendChild(countdownOverlay);
+                
+                // Добавляем анимацию
+                countdownOverlay.animate([
+                    { opacity: 0, transform: 'scale(0.5)' },
+                    { opacity: 1, transform: 'scale(1.2)' },
+                    { opacity: 1, transform: 'scale(1)' },
+                    { opacity: 0, transform: 'scale(3)' }
+                ], {
+                    duration: 1000,
+                    easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                });
+                
+                // Следующее число или запуск гонки
+                setTimeout(() => {
+                    // Удаляем элемент счетчика
+                    countdownOverlay.remove();
+                    
+                    if (number > 1) {
+                        // Анимируем следующее число
+                        animateNumber(number - 1);
+                    } else {
+                        // Запускаем гонку
+                        this.launchRace();
+                    }
+                }, 1000);
+            }
         };
         
-        // Запускаем обратный отсчет
-        animateNumber('3');
+        // Начинаем анимацию обратного отсчета
+        animateNumber(countdownValue, true);
+    }
+    
+    /**
+     * Запуск гонки после обратного отсчета
+     */
+    launchRace() {
+        if (!this.isRaceActive) return;
         
-        // Через 1 секунду показываем 2
-        setTimeout(() => {
-            animateNumber('2');
-        }, 1000);
+        // Обновляем время старта
+        this.raceStartTime = Date.now();
         
-        // Через 2 секунды показываем 1
-        setTimeout(() => {
-            animateNumber('1');
-        }, 2000);
+        // Запускаем гонку в менеджере улиток
+        if (this.snailManager) {
+            this.snailManager.startRace(Date.now());
+        }
         
-        // Через 3 секунды показываем START и запускаем гонку
-        setTimeout(() => {
-            animateNumber('START!', true);
-            
-            // Устанавливаем таймер гонки
-            this.raceStartTime = Date.now();
-            this.isRaceActive = true;
-            
-            // Запускаем гонку улиток
-            this.snailManager.startRace();
-            
-            // Устанавливаем статус гонки
-            this.raceStatusDisplay.textContent = 'Гонка началась!';
-            
-            // Устанавливаем таймер для автоматического завершения гонки
-            this.raceTimeout = setTimeout(() => {
-                if (this.isRaceActive) {
-                    console.log('Время гонки истекло, принудительное завершение');
-                    this.forceEndRace();
-                }
-            }, ASSETS.GAME.RACE_DURATION_MS);
-            
-            // Удаляем элемент обратного отсчета после завершения
-            setTimeout(() => {
-                this.gameScreen.removeChild(countdownEl);
-            }, 1000);
-        }, 3000);
+        // Запускаем игровой цикл, если он еще не запущен
+        if (!this.gameLoopRunning) {
+            this.gameLoopRunning = true;
+            this.lastFrameTime = null;
+            window.requestAnimationFrame(this.gameLoop.bind(this));
+        }
+        
+        // Устанавливаем таймер на завершение гонки через 1 минуту
+        this.raceTimeout = setTimeout(() => {
+            console.log("Гонка завершается по таймауту (1 минута)");
+            this.endRace();
+        }, ASSETS.GAME.RACE_DURATION_MS);
+        
+        console.log("Гонка запущена!");
+        this.raceStatusDisplay.textContent = "Гонка началась!";
     }
     
     /**
@@ -777,52 +825,76 @@ class Game {
             this.raceTimeout = null;
         }
         
-        // Получаем позицию улитки игрока
-        const playerPosition = results.find(result => result.type === this.selectedSnailType)?.position || 0;
+        // Получаем финишировавших улиток
+        let finishedSnails = [];
+        if (Array.isArray(results)) {
+            finishedSnails = results;
+        } else if (results.finishedSnails) {
+            finishedSnails = results.finishedSnails;
+        }
         
-        // Определяем, выиграл ли игрок
-        const isWinner = playerPosition === 1;
+        // Находим улитку игрока и определяем её позицию
+        const playerSnail = finishedSnails.find(snail => snail.type === this.selectedSnailType);
+        const playerPosition = playerSnail ? playerSnail.position : 0;
         
         // Воспроизводим звук завершения гонки
         this.playSound(ASSETS.SOUNDS.FINISH);
         
         // Обновляем баланс в зависимости от результата
-        if (isWinner) {
-            // Игрок выиграл, применяем множитель выигрыша
-            const winnings = Math.floor(this.bet * ASSETS.GAME.WINNING_MULTIPLIER);
+        if (playerPosition === 1) {
+            // Первое место - x5 от ставки
+            const winnings = Math.floor(this.bet * ASSETS.GAME.FIRST_PLACE_MULTIPLIER);
             this.balance += winnings;
             
             // Выводим сообщение о выигрыше
             this.resultsMessage.innerHTML = `
                 <div class="win-message">Вы выиграли!</div>
-                <div class="win-amount">+${winnings} монет</div>
+                <div class="win-amount">+${winnings} монет (x5)</div>
             `;
             this.resultsMessage.classList.add('win');
             this.resultsMessage.classList.remove('lose');
+            this.resultsMessage.classList.remove('partial-win');
         } else if (playerPosition === 2) {
-            // Игрок занял второе место, возвращаем часть ставки
+            // Второе место - 50% кешбэк
             const refund = Math.floor(this.bet * ASSETS.GAME.SECOND_PLACE_MULTIPLIER);
             this.balance += refund;
             
             // Выводим сообщение о возврате части ставки
             this.resultsMessage.innerHTML = `
                 <div class="partial-win-message">Ваша улитка на 2 месте</div>
-                <div class="partial-win-amount">+${refund} монет</div>
+                <div class="partial-win-amount">+${refund} монет (50% кешбэк)</div>
+            `;
+            this.resultsMessage.classList.add('partial-win');
+            this.resultsMessage.classList.remove('win');
+            this.resultsMessage.classList.remove('lose');
+        } else if (playerPosition === 3) {
+            // Третье место - 25% кешбэк
+            const refund = Math.floor(this.bet * ASSETS.GAME.THIRD_PLACE_MULTIPLIER);
+            this.balance += refund;
+            
+            // Выводим сообщение о возврате части ставки
+            this.resultsMessage.innerHTML = `
+                <div class="partial-win-message">Ваша улитка на 3 месте</div>
+                <div class="partial-win-amount">+${refund} монет (25% кешбэк)</div>
             `;
             this.resultsMessage.classList.add('partial-win');
             this.resultsMessage.classList.remove('win');
             this.resultsMessage.classList.remove('lose');
         } else {
-            // Игрок проиграл
+            // 4-5 места - проигрыш
             this.resultsMessage.innerHTML = `
                 <div class="lose-message">Вы проиграли!</div>
                 <div class="lose-amount">-${this.bet} монет</div>
             `;
             this.resultsMessage.classList.add('lose');
             this.resultsMessage.classList.remove('win');
+            this.resultsMessage.classList.remove('partial-win');
         }
         
-        // Отображаем все позиции
+        // Обновляем отображение баланса
+        this.updateBalanceDisplay();
+        
+        // Отображаем все позиции улиток в таблице
         this.displayRacePositions(finishedSnails);
         
         // Показываем экран результатов
@@ -832,7 +904,7 @@ class Game {
     }
     
     /**
-     * Отображение позиций улиток в гонке
+     * Отображение позиций улиток в таблице результатов
      */
     displayRacePositions(finishedSnails) {
         this.racePositions.innerHTML = '';
@@ -840,23 +912,112 @@ class Game {
         // Сортируем улиток по позициям
         const sortedSnails = [...finishedSnails].sort((a, b) => a.position - b.position);
         
-        // Создаем список с позициями
-        const list = document.createElement('ol');
+        // Создаем таблицу с результатами
+        const table = document.createElement('table');
+        table.className = 'race-results-table';
         
-        for (const snail of sortedSnails) {
-            const item = document.createElement('li');
+        // Создаем заголовок таблицы
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        
+        // Заголовки столбцов
+        ['Место', 'Улитка', 'Время', 'Приз'].forEach(headerText => {
+            const th = document.createElement('th');
+            th.textContent = headerText;
+            headerRow.appendChild(th);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        // Создаем тело таблицы
+        const tbody = document.createElement('tbody');
+        
+        // Добавляем строки для каждой улитки
+        sortedSnails.forEach(snail => {
+            const row = document.createElement('tr');
             
-            // Выделяем улитку игрока
-            if (snail === this.snailManager.playerSnail) {
-                item.style.fontWeight = 'bold';
-                item.style.color = snail.color;
+            // Если это улитка игрока, выделяем её
+            if (snail.type === this.selectedSnailType) {
+                row.className = 'player-snail';
+                row.style.fontWeight = 'bold';
+                row.style.backgroundColor = `${snail.color}33`; // Полупрозрачный цвет улитки
             }
             
-            item.textContent = `${snail.name} (${snail.type}) - ${(snail.finishTime / 1000).toFixed(2)}s`;
-            list.appendChild(item);
-        }
+            // Колонка 1: Место
+            const positionCell = document.createElement('td');
+            positionCell.textContent = snail.position;
+            row.appendChild(positionCell);
+            
+            // Колонка 2: Улитка (имя и тип)
+            const nameCell = document.createElement('td');
+            nameCell.textContent = `${snail.name} (${snail.type})`;
+            row.appendChild(nameCell);
+            
+            // Колонка 3: Время
+            const timeCell = document.createElement('td');
+            timeCell.textContent = `${(snail.finishTime / 1000).toFixed(2)}s`;
+            row.appendChild(timeCell);
+            
+            // Колонка 4: Приз (только для улитки игрока)
+            const prizeCell = document.createElement('td');
+            if (snail.type === this.selectedSnailType) {
+                // Расчет приза в зависимости от места
+                let prizeText = '';
+                if (snail.position === 1) {
+                    const winnings = Math.floor(this.bet * ASSETS.GAME.FIRST_PLACE_MULTIPLIER);
+                    prizeText = `+${winnings} (x5)`;
+                    prizeCell.style.color = '#00c853'; // Зеленый цвет для выигрыша
+                } else if (snail.position === 2) {
+                    const refund = Math.floor(this.bet * ASSETS.GAME.SECOND_PLACE_MULTIPLIER);
+                    prizeText = `+${refund} (50%)`;
+                    prizeCell.style.color = '#2196f3'; // Синий цвет для частичного возврата
+                } else if (snail.position === 3) {
+                    const refund = Math.floor(this.bet * ASSETS.GAME.THIRD_PLACE_MULTIPLIER);
+                    prizeText = `+${refund} (25%)`;
+                    prizeCell.style.color = '#2196f3'; // Синий цвет для частичного возврата
+                } else {
+                    prizeText = `-${this.bet}`;
+                    prizeCell.style.color = '#f44336'; // Красный цвет для проигрыша
+                }
+                prizeCell.textContent = prizeText;
+            } else {
+                prizeCell.textContent = '-';
+            }
+            row.appendChild(prizeCell);
+            
+            tbody.appendChild(row);
+        });
         
-        this.racePositions.appendChild(list);
+        table.appendChild(tbody);
+        this.racePositions.appendChild(table);
+        
+        // Добавляем стили для таблицы
+        const style = document.createElement('style');
+        style.textContent = `
+            .race-results-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .race-results-table th, .race-results-table td {
+                padding: 8px 12px;
+                text-align: center;
+                border: 1px solid #e0e0e0;
+            }
+            .race-results-table th {
+                background-color: #f5f5f5;
+                font-weight: bold;
+            }
+            .race-results-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            .race-results-table .player-snail {
+                background-color: rgba(255, 235, 59, 0.1);
+            }
+        `;
+        this.racePositions.appendChild(style);
     }
     
     /**
@@ -969,8 +1130,50 @@ class Game {
         // Форматируем время
         const timeStr = `${seconds}.${milliseconds.toString().padStart(2, '0')}`;
         
+        // Рассчитываем оставшееся время
+        const remainingMs = Math.max(0, ASSETS.GAME.RACE_DURATION_MS - elapsed);
+        const remainingSeconds = Math.floor(remainingMs / 1000);
+        const remainingMilliseconds = Math.floor((remainingMs % 1000) / 10);
+        
+        // Форматируем оставшееся время
+        const minutesPart = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+        const secondsPart = (remainingSeconds % 60).toString().padStart(2, '0');
+        const remainingTimeStr = `${minutesPart}:${secondsPart}`;
+        
         // Обновляем отображение
-        this.raceStatusDisplay.textContent = `Время: ${timeStr}с`;
+        this.raceStatusDisplay.innerHTML = `
+            <div>Время: ${timeStr}с</div>
+            <div style="color: ${remainingSeconds <= 10 ? '#ff3333' : '#ffffff'}; 
+                       font-weight: ${remainingSeconds <= 10 ? 'bold' : 'normal'}">
+                Осталось: ${remainingTimeStr}
+            </div>
+        `;
+        
+        // Если осталось мало времени (10 секунд или меньше), добавляем анимацию мигания
+        if (remainingSeconds <= 10) {
+            if (!this.raceStatusDisplay.classList.contains('blinking')) {
+                this.raceStatusDisplay.classList.add('blinking');
+                
+                // Добавляем стиль анимации, если его еще нет
+                if (!document.getElementById('blink-animation-style')) {
+                    const style = document.createElement('style');
+                    style.id = 'blink-animation-style';
+                    style.textContent = `
+                        @keyframes blink {
+                            0% { opacity: 1; }
+                            50% { opacity: 0.5; }
+                            100% { opacity: 1; }
+                        }
+                        .blinking {
+                            animation: blink 1s infinite;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            }
+        } else {
+            this.raceStatusDisplay.classList.remove('blinking');
+        }
         
         // Принудительно завершаем гонку, если превышено максимальное время
         if (elapsed >= ASSETS.GAME.RACE_DURATION_MS) {

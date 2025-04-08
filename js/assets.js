@@ -131,9 +131,10 @@ const GAME_ASSETS = {
         MIN_BET: 1,
         MAX_BET: 100,
         DEFAULT_BET: 10,
-        WINNING_MULTIPLIER: 2.5,
-        SECOND_PLACE_MULTIPLIER: 1.2,
-        RACE_DURATION_MS: 60000,  // Максимальная длительность гонки (увеличиваем до 60 секунд)
+        FIRST_PLACE_MULTIPLIER: 5.0, // x5 от ставки для первого места
+        SECOND_PLACE_MULTIPLIER: 0.5, // 50% кешбэк для второго места
+        THIRD_PLACE_MULTIPLIER: 0.25, // 25% кешбэк для третьего места
+        RACE_DURATION_MS: 60000,  // Максимальная длительность гонки - 1 минута
         SNAIL_COUNT: 5,           // Количество улиток в гонке
         DIFFICULTY: 'medium'      // Сложность по умолчанию
     },

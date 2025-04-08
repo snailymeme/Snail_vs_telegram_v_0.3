@@ -670,27 +670,45 @@ class Snail {
     }
     
     /**
-     * Завершение гонки для улитки
+     * Финиш улитки
+     * @param {number} position - Позиция на финише
+     * @param {boolean} isAutoFinish - Флаг автоматического финиша при окончании времени гонки
      */
-    finish(position) {
+    finish(position, isAutoFinish = false) {
         this.hasFinished = true;
         this.isMoving = false;
         this.position = position;
-        this.finishTime = Date.now() - this.lastMoveTime;
+        
+        // Устанавливаем время финиша, если оно еще не установлено
+        if (!this.finishTime || this.finishTime <= 0) {
+            this.finishTime = Date.now() - this.lastMoveTime;
+        }
         
         // Добавляем эффект для финиша
         if (this.element) {
-            // Добавляем класс для winner анимации
-            if (position === 1) {
+            // Добавляем класс для winner анимации только если улитка заняла первое место и это не автофиниш
+            if (position === 1 && !isAutoFinish) {
                 this.element.classList.add('winner');
             }
             
             this.element.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.5s ease';
-            this.element.style.filter = 'drop-shadow(0 0 10px gold) brightness(1.3)';
-            this.element.style.transform = `translate3d(${this.displayX + (this.cellSize - parseFloat(this.element.style.width)) / 2}px, ${this.displayY + (this.cellSize - parseFloat(this.element.style.height)) / 2}px, 0) scale(1.2)`;
+            
+            // Более заметный эффект для победителей и менее заметный для автофиниша
+            if (position <= 3 && !isAutoFinish) {
+                this.element.style.filter = 'drop-shadow(0 0 10px gold) brightness(1.3)';
+                this.element.style.transform = `translate3d(${this.displayX + (this.cellSize - parseFloat(this.element.style.width)) / 2}px, ${this.displayY + (this.cellSize - parseFloat(this.element.style.height)) / 2}px, 0) scale(1.2)`;
+            } else {
+                this.element.style.filter = 'brightness(1.1)';
+                this.element.style.transform = `translate3d(${this.displayX + (this.cellSize - parseFloat(this.element.style.width)) / 2}px, ${this.displayY + (this.cellSize - parseFloat(this.element.style.height)) / 2}px, 0) scale(1.05)`;
+            }
         }
         
-        console.log(`${this.name} финишировал на позиции ${position}! Время: ${this.finishTime}мс`);
+        // Логируем результат
+        if (isAutoFinish) {
+            console.log(`${this.name} автоматически финишировал на позиции ${position}! Расстояние до финиша: ${this.distanceToFinish}`);
+        } else {
+            console.log(`${this.name} финишировал на позиции ${position}! Время: ${this.finishTime}мс`);
+        }
     }
     
     /**

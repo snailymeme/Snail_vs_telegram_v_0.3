@@ -428,20 +428,44 @@ class SnailManager {
      * Принудительное завершение гонки
      */
     forceEndRace() {
+        if (!this.raceInProgress) return;
+        
+        console.log("Принудительное завершение гонки");
+        this.raceInProgress = false;
+        
         // Останавливаем фоновую музыку
         this.stopBackgroundMusic();
         
-        // Останавливаем всех улиток
-        for (const snail of this.snails) {
-            snail.stopMoving();
-            
-            // Если улитка еще не финишировала, добавляем ее в конец списка
+        // Определяем текущие позиции улиток и их близость к финишу
+        const finishRow = this.maze.finish.row;
+        const finishCol = this.maze.finish.col;
+        
+        // Для неподвижных улиток имитируем завершение
+        const snailsToFinish = [...this.snails];
+        
+        // Сортируем улиток по близости к финишу
+        // Рассчитываем дистанцию до финиша для каждой улитки
+        snailsToFinish.forEach(snail => {
             if (!snail.hasFinished) {
-                this.finishedCount++;
-                snail.finishPosition = this.finishedCount;
-                this.finishedSnails.push(snail);
+                // Расстояние от улитки до финиша (Манхэттенское расстояние)
+                snail.distanceToFinish = Math.abs(snail.row - finishRow) + Math.abs(snail.col - finishCol);
+                
+                // Сохраняем текущее время как финишное
+                snail.finishTime = Date.now() - this.raceStartTime;
             }
-        }
+        });
+        
+        // Сортируем невинишировавших улиток по близости к финишу (ближе = лучше)
+        const unfinishedSnails = snailsToFinish.filter(snail => !snail.hasFinished)
+                                             .sort((a, b) => a.distanceToFinish - b.distanceToFinish);
+        
+        // Устанавливаем позиции для неподвижных улиток
+        let nextPosition = this.finishedCount + 1;
+        unfinishedSnails.forEach(snail => {
+            snail.finish(nextPosition, true); // Передаем true для флага автоматического финиша
+            this.finishedSnails.push(snail);
+            nextPosition++;
+        });
         
         // Отправляем событие о завершении гонки
         this.sendRaceFinishedEvent();
