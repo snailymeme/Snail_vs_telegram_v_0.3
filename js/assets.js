@@ -26,7 +26,7 @@ const GAME_ASSETS = {
         ROCKET: 'mp3/rocket.mp3',
         FINISH: 'mp3/finish.mp3',
         RACE_START: 'mp3/race_start.mp3',
-        RACE_MUSIC: 'mp3/musik.mp3'
+        RACE_MUSIC: 'mp3/music.mp3'
     },
     
     // Типы ячеек лабиринта
@@ -198,7 +198,7 @@ const GAME_ASSETS = {
         'mp3/rocket.mp3',
         'mp3/finish.mp3',
         'mp3/race_start.mp3',
-        'mp3/musik.mp3'
+        'mp3/music.mp3'
     ],
     
     /**

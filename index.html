@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="css/styles.css">
     <!-- Прелоадер для фонового изображения -->
     <link rel="preload" href="images/background.png" as="image">
+    <!-- Предзагрузка аудио файлов -->
+    <link rel="preload" href="mp3/music.mp3" as="audio" crossorigin="anonymous">
+    <link rel="preload" href="mp3/race_start.mp3" as="audio" crossorigin="anonymous">
+    <link rel="preload" href="mp3/finish.mp3" as="audio" crossorigin="anonymous">
     <style>
         /* Стиль для canvas и отображения стиля лабиринта */
         #maze-container {
@@ -52,6 +56,51 @@
         console.log('HTML document loading...');
         window.addEventListener('DOMContentLoaded', () => {
             console.log('DOM fully loaded');
+            
+            // Разблокировка воспроизведения аудио при первом взаимодействии
+            function unlockAudio() {
+                console.log("Разблокировка аудио контекста по взаимодействию с пользователем");
+                
+                // Активация предзагруженных аудио элементов
+                const audioElements = document.querySelectorAll('audio');
+                audioElements.forEach(audio => {
+                    audio.play().then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        console.log("Аудио элемент успешно активирован");
+                    }).catch(e => {
+                        console.warn("Не удалось разблокировать аудио элемент:", e);
+                    });
+                });
+                
+                // Активация Web Audio API, если он используется
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        const tempContext = new AudioContext();
+                        tempContext.resume().then(() => {
+                            console.log("AudioContext успешно разблокирован:", tempContext.state);
+                            // Создаем и сразу останавливаем пустой звук для активации контекста
+                            const oscillator = tempContext.createOscillator();
+                            oscillator.connect(tempContext.destination);
+                            oscillator.start(0);
+                            oscillator.stop(0.001);
+                        });
+                    }
+                } catch (e) {
+                    console.warn("Ошибка при разблокировке AudioContext:", e);
+                }
+                
+                // Удаляем обработчики после успешной разблокировки
+                document.removeEventListener('click', unlockAudio);
+                document.removeEventListener('touchstart', unlockAudio);
+                document.removeEventListener('keydown', unlockAudio);
+            }
+            
+            // Добавляем обработчики событий для разблокировки
+            document.addEventListener('click', unlockAudio);
+            document.addEventListener('touchstart', unlockAudio);
+            document.addEventListener('keydown', unlockAudio);
             
             // Проверка на запуск в Telegram
             if (window.Telegram && window.Telegram.WebApp) {
@@ -216,6 +265,17 @@
             <p>&copy; 2025 Snail to Riches. All rights reserved.</p>
         </footer>
     </div>
+    
+    <!-- Скрытые аудио элементы для предзагрузки -->
+    <audio id="background-music" preload="auto" loop style="display:none">
+        <source src="mp3/music.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="race-start-sound" preload="auto" style="display:none">
+        <source src="mp3/race_start.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="finish-sound" preload="auto" style="display:none">
+        <source src="mp3/finish.mp3" type="audio/mpeg">
+    </audio>
     
     <!-- Подключаем скрипты -->
     <script src="js/assets.js"></script>

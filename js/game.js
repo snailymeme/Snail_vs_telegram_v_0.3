@@ -359,49 +359,113 @@ class Game {
      * Загрузка ресурсов перед началом игры
      */
     loadResources() {
-        // Список всех изображений для загрузки
-        const resources = [
-            { type: 'image', src: 'images/background.png', name: 'Фон игры' },
-            { type: 'image', src: 'images/red_snail.png', name: 'Красная улитка' },
-            { type: 'image', src: 'images/blue_snail.png', name: 'Синяя улитка' },
-            { type: 'image', src: 'images/green_snail.png', name: 'Зеленая улитка' },
-            { type: 'image', src: 'images/purple_snail.png', name: 'Фиолетовая улитка' },
-            { type: 'image', src: 'images/yellow_snail.png', name: 'Желтая улитка' },
-            { type: 'image', src: 'images/finish_flag.png', name: 'Финишный флаг' },
-            { type: 'script', src: 'js/mazeStyles.js', name: 'Стили лабиринта' },
-            { type: 'script', src: 'js/snail.js', name: 'Механика улиток' },
-            { type: 'image', src: 'images/background.png', name: 'Текстуры лабиринта' },
-            { type: 'script', src: 'js/assets.js', name: 'Конфигурация игры' },
-            { type: 'script', src: 'js/maze.js', name: 'Генератор лабиринта' },
-            { type: 'script', src: 'js/snail-manager.js', name: 'Менеджер улиток' },
-            { type: 'image', src: 'images/background.png', name: 'Фоновые элементы' },
-            { type: 'script', src: 'js/game.js', name: 'Основной движок игры' },
-            { type: 'image', src: 'images/background.png', name: 'Системные ресурсы' },
-            { type: 'image', src: 'images/background.png', name: 'Звуковые эффекты' },
-            { type: 'image', src: 'images/background.png', name: 'Шрифты интерфейса' },
-            { type: 'image', src: 'images/background.png', name: 'Графические эффекты' },
-            { type: 'image', src: 'images/background.png', name: 'Завершающие настройки' },
-        ];
+        // Показываем экран загрузки
+        this.showLoadingScreen();
         
-        // Быстрая загрузка ресурсов без отображения индикатора прогресса
-        const startLoading = async () => {
-            // Сразу инициализируем игру
-            this.isLoading = false;
-            
-            // Показываем игру без задержки
-            this.mainGame.classList.remove('hidden');
-            
-            // Инициализируем игру
-            this.showSelectionScreen();
-            
-            // Фоновая загрузка без отображения прогресса
-            for (let i = 0; i < resources.length; i++) {
-                console.log(`Ресурс ${resources[i].name} загружен`);
+        // Предварительно загружаем аудиофайлы
+        this.preloadAudioFiles();
+        
+        // Загружаем ресурсы с использованием ASSETS
+        ASSETS.loadResources(
+            // Коллбэк прогресса загрузки
+            (loaded, total) => {
+                const progress = Math.floor((loaded / total) * 100);
+                this.loadingProgress.style.width = `${progress}%`;
+                this.loadingText.textContent = `Загрузка ресурсов: ${progress}% (${loaded}/${total})`;
+            },
+            // Коллбэк завершения загрузки
+            () => {
+                console.log('Все ресурсы загружены');
+                this.isLoading = false;
+                
+                // Скрываем экран загрузки и показываем игру через 500мс
+                setTimeout(() => {
+                    this.hideLoadingScreen();
+                    this.showSelectionScreen();
+                }, 500);
+            }
+        );
+    }
+    
+    /**
+     * Предварительная загрузка аудиофайлов
+     */
+    preloadAudioFiles() {
+        console.log("Предварительная загрузка аудиофайлов");
+        
+        // Проверяем доступность файла
+        const checkFileExists = async (url) => {
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                return response.ok;
+            } catch (e) {
+                console.error(`Ошибка проверки файла ${url}:`, e);
+                return false;
             }
         };
         
-        // Запускаем процесс загрузки
-        startLoading();
+        // Список всех звуковых файлов для предзагрузки
+        const audioFiles = [
+            ASSETS.SOUNDS.CLICK,
+            ASSETS.SOUNDS.BOMB,
+            ASSETS.SOUNDS.ROCKET,
+            ASSETS.SOUNDS.FINISH,
+            ASSETS.SOUNDS.RACE_START,
+            ASSETS.SOUNDS.RACE_MUSIC
+        ];
+        
+        // Для каждого файла создаем Audio элемент и загружаем его
+        audioFiles.forEach(async (file) => {
+            if (!file) return;
+            
+            const audioUrl = new URL(file, window.location.href).href;
+            console.log(`Предзагрузка аудио: ${audioUrl}`);
+            
+            // Проверяем существование файла
+            const exists = await checkFileExists(audioUrl);
+            if (!exists) {
+                console.error(`Аудиофайл не найден: ${audioUrl}`);
+                return;
+            }
+            
+            const audio = new Audio();
+            audio.addEventListener('canplaythrough', () => {
+                console.log(`Аудиофайл загружен: ${file}`);
+            });
+            
+            audio.addEventListener('error', (e) => {
+                console.error(`Ошибка загрузки аудио ${file}:`, e);
+            });
+            
+            audio.preload = 'auto';
+            audio.src = audioUrl;
+            
+            // Сохраняем ссылку на аудио объект для предотвращения сборки мусора
+            if (!this.preloadedAudio) this.preloadedAudio = [];
+            this.preloadedAudio.push(audio);
+        });
+    }
+    
+    /**
+     * Показ экрана загрузки
+     */
+    showLoadingScreen() {
+        this.loader.classList.remove('hidden');
+        this.mainGame.classList.add('hidden');
+        this.selectionScreen.classList.add('hidden');
+        this.gameScreen.classList.add('hidden');
+        this.resultsScreen.classList.add('hidden');
+    }
+    
+    /**
+     * Скрытие экрана загрузки
+     */
+    hideLoadingScreen() {
+        this.loader.classList.add('hidden');
+        this.mainGame.classList.remove('hidden');
+        this.selectionScreen.classList.add('hidden');
+        this.gameScreen.classList.add('hidden');
+        this.resultsScreen.classList.add('hidden');
     }
     
     /**
@@ -1092,10 +1156,79 @@ class Game {
      * @param {string} soundPath - путь к звуковому файлу
      */
     playSound(soundPath) {
-        if (!soundPath) return;
+        if (!soundPath) {
+            console.error("Не указан путь к звуковому файлу");
+            return;
+        }
         
+        console.log(`Попытка воспроизведения звука: ${soundPath}`);
+        
+        // Проверяем, существует ли файл
+        const audioUrl = new URL(soundPath, window.location.href).href;
+        console.log(`Полный URL звука: ${audioUrl}`);
+        
+        // Сначала проверяем наличие предзагруженных аудио элементов
+        let soundId = null;
+        
+        if (soundPath === ASSETS.SOUNDS.RACE_START) {
+            soundId = 'race-start-sound';
+        } else if (soundPath === ASSETS.SOUNDS.FINISH) {
+            soundId = 'finish-sound';
+        } else if (soundPath === ASSETS.SOUNDS.RACE_MUSIC) {
+            soundId = 'background-music';
+        }
+        
+        // Если есть предзагруженный элемент, используем его
+        if (soundId) {
+            const audioElement = document.getElementById(soundId);
+            if (audioElement) {
+                console.log(`Воспроизведение предзагруженного звука: ${soundId}`);
+                
+                // Проверяем наличие source с правильным путем
+                const source = audioElement.querySelector('source');
+                if (source && source.src !== audioUrl) {
+                    console.log(`Обновление пути аудио с ${source.src} на ${audioUrl}`);
+                    source.src = audioUrl;
+                    audioElement.load(); // Перезагружаем аудио с новым путем
+                }
+                
+                audioElement.currentTime = 0; // Сбрасываем на начало для повторного воспроизведения
+                const playPromise = audioElement.play();
+                
+                if (playPromise) {
+                    playPromise.catch(e => {
+                        console.error(`Ошибка воспроизведения звука ${soundId}:`, e);
+                        // Создаем новый аудио элемент как запасной вариант
+                        this.fallbackPlaySound(soundPath);
+                    });
+                }
+                return;
+            } else {
+                console.warn(`Предзагруженный элемент ${soundId} не найден`);
+            }
+        }
+        
+        // Запасной вариант: создаем новый Audio элемент
+        this.fallbackPlaySound(soundPath);
+    }
+    
+    /**
+     * Запасной метод воспроизведения звука через новый Audio элемент
+     * @param {string} soundPath - путь к звуковому файлу
+     */
+    fallbackPlaySound(soundPath) {
+        console.log(`Воспроизведение звука через новый Audio: ${soundPath}`);
         const audio = new Audio(soundPath);
         audio.volume = 0.4; // Громкость на 40%
-        audio.play().catch(e => console.error('Ошибка воспроизведения звука:', e));
+        
+        // Обрабатываем ошибки
+        audio.addEventListener('error', (e) => {
+            console.error(`Ошибка воспроизведения звука: ${soundPath}`, e);
+        });
+        
+        // Воспроизводим
+        audio.play().catch(e => {
+            console.error(`Не удалось воспроизвести звук ${soundPath}:`, e);
+        });
     }
 } 
