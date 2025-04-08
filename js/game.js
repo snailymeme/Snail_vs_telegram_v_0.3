@@ -482,21 +482,20 @@ class Game {
     startRace() {
         // Проверяем, выбрана ли улитка
         if (!this.selectedSnailType) {
-            alert('Пожалуйста, выберите улитку для гонки!');
+            alert('Пожалуйста, выберите улитку!');
             return;
         }
         
-        // Проверяем, достаточно ли баланса для ставки
-        if (this.bet > this.balance) {
+        // Проверяем, достаточно ли средств для ставки
+        if (this.balance < this.bet) {
             alert('Недостаточно средств для ставки!');
             return;
         }
         
-        // Перед началом гонки рандомно распределяем характеристики улиток
-        this.randomizeSnailAbilities();
-        
-        // Списываем ставку с баланса
+        // Вычитаем ставку из баланса
         this.balance -= this.bet;
+        
+        // Обновляем отображение баланса
         this.updateBalanceDisplay();
         
         // Показываем игровой экран
@@ -506,6 +505,9 @@ class Game {
         const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
         const rows = mazeConfig.ROWS + 5; // Добавляем +5 рядов
         const cols = mazeConfig.COLS + 5; // Добавляем +5 колонок
+        
+        // Рандомизируем характеристики улиток перед гонкой
+        this.randomizeSnailAbilities();
         
         // Создаем экземпляр генератора лабиринта
         const mazeGenerator = new MazeGenerator(rows, cols, this.difficulty);
@@ -543,9 +545,9 @@ class Game {
         countdownEl.style.transform = 'translate(-50%, -50%)';
         countdownEl.style.fontSize = '120px';
         countdownEl.style.fontWeight = 'bold';
-        countdownEl.style.color = '#FECD51';
-        countdownEl.style.textShadow = '0 0 10px rgba(100,50,0,0.7), 4px 4px 0 #8B5927';
-        countdownEl.style.fontFamily = 'Arial Rounded MT Bold, Arial, sans-serif';
+        countdownEl.style.color = '#FF9900';
+        countdownEl.style.textShadow = '0 0 15px rgba(255,153,0,0.7), 3px 3px 0 #CC6600';
+        countdownEl.style.fontFamily = 'Impact, Haettenschweiler, Arial Narrow Bold, sans-serif';
         countdownEl.style.zIndex = '1000';
         countdownEl.style.opacity = '0';
         countdownEl.style.transition = 'transform 0.5s, opacity 0.5s';
@@ -561,7 +563,7 @@ class Game {
                 
                 // Если это надпись START, меняем размер шрифта
                 if (isStart) {
-                    countdownEl.style.fontSize = '80px';
+                    countdownEl.style.fontSize = '60px';
                 } else {
                     countdownEl.style.fontSize = '120px';
                 }

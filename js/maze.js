@@ -392,6 +392,13 @@ class Maze {
         
         // Время для эффектов анимации
         this.effectTime = 0;
+        
+        // Предварительная загрузка изображений для ловушек и ускорителей
+        this.trapImage = new Image();
+        this.trapImage.src = 'images/bomb.png';
+        
+        this.boostImage = new Image();
+        this.boostImage.src = 'images/rocket.png';
     }
     
     /**
@@ -586,28 +593,36 @@ class Maze {
      * Отрисовка ловушки
      */
     drawTrap(ctx, x, y) {
-        // Рисуем индикатор ловушки
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.5)';
-        ctx.beginPath();
-        ctx.moveTo(x + this.cellSize / 2, y + this.cellSize / 4);
-        ctx.lineTo(x + this.cellSize / 4, y + 3 * this.cellSize / 4);
-        ctx.lineTo(x + 3 * this.cellSize / 4, y + 3 * this.cellSize / 4);
-        ctx.closePath();
-        ctx.fill();
+        // Рисуем индикатор ловушки (бомба)
+        // Используем заранее загруженное изображение
+        
+        // Рисуем изображение бомбы с уменьшенным размером
+        const imgSize = this.cellSize * 0.8;
+        ctx.drawImage(
+            this.trapImage, 
+            x + (this.cellSize - imgSize) / 2, 
+            y + (this.cellSize - imgSize) / 2, 
+            imgSize, 
+            imgSize
+        );
     }
     
     /**
      * Отрисовка ускорителя
      */
     drawBoost(ctx, x, y) {
-        // Рисуем индикатор ускорителя
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-        ctx.beginPath();
-        ctx.moveTo(x + this.cellSize / 4, y + this.cellSize / 4);
-        ctx.lineTo(x + this.cellSize / 4, y + 3 * this.cellSize / 4);
-        ctx.lineTo(x + 3 * this.cellSize / 4, y + this.cellSize / 2);
-        ctx.closePath();
-        ctx.fill();
+        // Рисуем индикатор ускорителя (ракета)
+        // Используем заранее загруженное изображение
+        
+        // Рисуем изображение ракеты с уменьшенным размером
+        const imgSize = this.cellSize * 0.8;
+        ctx.drawImage(
+            this.boostImage, 
+            x + (this.cellSize - imgSize) / 2, 
+            y + (this.cellSize - imgSize) / 2, 
+            imgSize, 
+            imgSize
+        );
     }
     
     /**

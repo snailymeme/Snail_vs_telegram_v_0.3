@@ -64,27 +64,27 @@ class Snail {
             case 'racer':
                 this.boostProbability = snailConfig.BOOST_PROBABILITY || 0.2;
                 this.boostMultiplier = snailConfig.BOOST_MULTIPLIER || 1.3;
-                this.wrongPathProbability = 0.5; // Базовое значение для типа
+                this.wrongPathProbability = 0.5; // Устанавливаем типовое значение
                 break;
                 
             case 'explorer':
                 this.explorationRate = snailConfig.EXPLORATION_RATE || 0.85;
-                this.wrongPathProbability = 0.75; // Базовое значение для типа
+                this.wrongPathProbability = 0.75; // Устанавливаем типовое значение
                 break;
                 
             case 'snake':
                 this.zigzagProbability = snailConfig.ZIGZAG_PROBABILITY || 0.9;
-                this.escapeDeadEndSpeed = 1.3; // Базовое значение для типа
+                this.escapeDeadEndSpeed = 1.3; // Устанавливаем типовое значение
                 break;
                 
             case 'stubborn':
                 this.forwardProbability = snailConfig.FORWARD_PROBABILITY || 0.9;
-                this.accelerationBoost = 1.1; // Базовое значение для типа
+                this.accelerationBoost = 1.1; // Устанавливаем типовое значение
                 break;
                 
             case 'deadender':
                 this.randomTurnProbability = snailConfig.RANDOM_TURN_PROBABILITY || 0.8;
-                this.pauseInDeadEndTime = 1500; // Базовое значение для типа
+                this.pauseInDeadEndTime = 1500; // Устанавливаем типовое значение
                 break;
         }
     }
