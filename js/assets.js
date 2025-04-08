@@ -43,32 +43,32 @@ const GAME_ASSETS = {
     // Настройки лабиринта
     MAZE: {
         EASY: {
-            ROWS: 15,
-            COLS: 15,
+            ROWS: 16,
+            COLS: 16,
             RANDOM_PATHS: 2,
-            TRAPS: 2,
-            BOOSTS: 2
-        },
-        MEDIUM: {
-            ROWS: 20,
-            COLS: 20, 
-            RANDOM_PATHS: 4,
-            TRAPS: 4,
+            TRAPS: 3,
             BOOSTS: 3
         },
-        HARD: {
-            ROWS: 25,
-            COLS: 25,
-            RANDOM_PATHS: 6,
+        MEDIUM: {
+            ROWS: 21,
+            COLS: 21, 
+            RANDOM_PATHS: 4,
             TRAPS: 6,
-            BOOSTS: 4
+            BOOSTS: 5
+        },
+        HARD: {
+            ROWS: 26,
+            COLS: 26,
+            RANDOM_PATHS: 6,
+            TRAPS: 9,
+            BOOSTS: 6
         },
         EXTREME: {
-            ROWS: 30,
-            COLS: 30,
+            ROWS: 31,
+            COLS: 31,
             RANDOM_PATHS: 8,
-            TRAPS: 8,
-            BOOSTS: 5
+            TRAPS: 12,
+            BOOSTS: 8
         }
     },
     
