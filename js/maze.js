@@ -358,40 +358,63 @@ class MazeGenerator {
  */
 class Maze {
     constructor(gridOrDifficulty, start = null, finish = null) {
-        // Проверяем тип первого аргумента
-        if (Array.isArray(gridOrDifficulty)) {
-            // Если передан готовый массив сетки
+        // Получаем настройки из ASSETS
+        let rows, cols;
+
+        // Определяем, что передано - уже готовая сетка или сложность
+        if (typeof gridOrDifficulty === 'string') {
+            // Передана сложность
+            const difficulty = gridOrDifficulty;
+            this.difficulty = difficulty;
+            const mazeConfig = ASSETS.MAZE[difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
+            rows = mazeConfig.ROWS;
+            cols = mazeConfig.COLS;
+            
+            // Генерируем новый лабиринт
+            const generator = new MazeGenerator(rows, cols, difficulty);
+            const mazeData = generator.generate();
+            
+            this.grid = mazeData.grid;
+            this.start = mazeData.start;
+            this.finish = mazeData.finish;
+        } else {
+            // Передана готовая сетка
             this.grid = gridOrDifficulty;
-            this.rows = this.grid.length;
-            this.cols = this.grid[0].length;
             this.start = start;
             this.finish = finish;
             this.difficulty = 'medium'; // По умолчанию средняя сложность
-            
-            console.log(`Maze: Инициализация с готовой сеткой ${this.rows}x${this.cols}`);
-        } else {
-            // Если передана сложность
-            this.difficulty = gridOrDifficulty || 'medium';
-            
-            // Получаем настройки из ASSETS
-            const mazeConfig = ASSETS.MAZE[this.difficulty.toUpperCase()] || ASSETS.MAZE.MEDIUM;
-            this.rows = mazeConfig.ROWS;
-            this.cols = mazeConfig.COLS;
-            
-            console.log(`Maze: Генерация лабиринта со сложностью ${this.difficulty} (${this.rows}x${this.cols})`);
-            
-            // Генерируем лабиринт
-            this.generate();
         }
         
+        // Проверка и поправка размеров
+        this.rows = this.grid.length;
+        this.cols = this.grid[0].length;
+        
+        // Убеждаемся, что старт и финиш определены
+        if (!this.start) {
+            this.start = { row: 1, col: 1 };
+            this.grid[1][1] = ASSETS.CELL_TYPES.START;
+        }
+        
+        if (!this.finish) {
+            this.finish = { row: this.rows - 2, col: this.cols - 2 };
+            this.grid[this.rows - 2][this.cols - 2] = ASSETS.CELL_TYPES.FINISH;
+        }
+        
+        // Настройки стилей лабиринта
         this.cellSize = ASSETS.CELL_SIZE;
+        
+        // Коэффициент для визуальных эффектов
+        this.effectTime = 0;
+        
+        // Список использованных ловушек (ячеек, которые должны быть удалены после использования)
+        this.usedTraps = new Set(); // Хранит строки вида "row,col"
+        
+        // Проверяем, что существует валидный путь между стартом и финишем
+        this.ensurePathExists();
         
         // Выбираем случайный стиль для лабиринта
         this.style = MAZE_STYLES.getRandomStyle();
         console.log(`Выбран стиль лабиринта: ${this.style.name}`);
-        
-        // Время для эффектов анимации
-        this.effectTime = 0;
         
         // Предварительная загрузка изображений для ловушек и ускорителей
         this.trapImage = new Image();
@@ -399,23 +422,6 @@ class Maze {
         
         this.boostImage = new Image();
         this.boostImage.src = 'images/rocket.png';
-    }
-    
-    /**
-     * Генерация лабиринта
-     */
-    generate() {
-        const generator = new MazeGenerator(this.rows, this.cols, this.difficulty);
-        const result = generator.generate();
-        
-        this.grid = result.grid;
-        this.start = result.start;
-        this.finish = result.finish;
-        
-        // Проверка, что путь от старта до финиша существует
-        this.ensurePathExists();
-        
-        return this;
     }
     
     /**
@@ -445,18 +451,23 @@ class Maze {
      * Получение ячейки лабиринта по координатам
      */
     getCell(row, col) {
+        return this.getCellType(row, col);
+    }
+    
+    /**
+     * Получение типа ячейки с учетом использованных ловушек
+     */
+    getCellType(row, col) {
+        // Проверяем, является ли ячейка использованной ловушкой
+        const key = `${row},${col}`;
+        if (this.usedTraps.has(key)) {
+            return ASSETS.CELL_TYPES.PATH; // Возвращаем обычный путь вместо использованной ловушки
+        }
+        
         if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
             return this.grid[row][col];
         }
         return null;
-    }
-    
-    /**
-     * Проверка, является ли ячейка проходимой
-     */
-    isWalkable(row, col) {
-        const cell = this.getCell(row, col);
-        return cell !== null && cell !== ASSETS.CELL_TYPES.WALL;
     }
     
     /**
@@ -469,7 +480,9 @@ class Maze {
         // Отрисовка всех ячеек лабиринта
         for (let row = 0; row < this.rows; row++) {
             for (let col = 0; col < this.cols; col++) {
-                const cellType = this.grid[row][col];
+                // Используем getCellType вместо прямого обращения к grid,
+                // чтобы учитывать использованные ловушки
+                const cellType = this.getCellType(row, col);
                 const x = col * this.cellSize;
                 const y = row * this.cellSize;
                 
@@ -641,13 +654,40 @@ class Maze {
     }
     
     /**
-     * Получение типа ячейки по координатам
+     * Отмечает ловушку как использованную
      */
-    getCellType(row, col) {
-        if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
-            return this.grid[row][col];
+    markTrapAsUsed(row, col) {
+        const cellType = this.getCell(row, col);
+        if (cellType === ASSETS.CELL_TYPES.TRAP || cellType === ASSETS.CELL_TYPES.BOOST) {
+            const key = `${row},${col}`;
+            this.usedTraps.add(key);
+            
+            // Воспроизводим соответствующий звук
+            if (cellType === ASSETS.CELL_TYPES.TRAP) {
+                this.playSound(ASSETS.SOUNDS.BOMB);
+            } else if (cellType === ASSETS.CELL_TYPES.BOOST) {
+                this.playSound(ASSETS.SOUNDS.ROCKET);
+            }
+            
+            console.log(`Ловушка на позиции ${row},${col} использована и будет удалена`);
         }
-        return null;
+    }
+    
+    /**
+     * Воспроизведение звука
+     */
+    playSound(soundPath) {
+        const audio = new Audio(soundPath);
+        audio.volume = 0.5; // Устанавливаем громкость на 50%
+        audio.play().catch(e => console.error('Ошибка воспроизведения звука:', e));
+    }
+    
+    /**
+     * Проверка, является ли ячейка проходимой
+     */
+    isWalkable(row, col) {
+        const cellType = this.getCellType(row, col);
+        return cellType !== null && cellType !== ASSETS.CELL_TYPES.WALL;
     }
     
     /**
@@ -668,5 +708,25 @@ class Maze {
             finishRow, 
             finishCol
         );
+    }
+    
+    /**
+     * Генерация лабиринта (для перегенерации)
+     */
+    generate() {
+        const generator = new MazeGenerator(this.rows, this.cols, this.difficulty);
+        const result = generator.generate();
+        
+        this.grid = result.grid;
+        this.start = result.start;
+        this.finish = result.finish;
+        
+        // Сбрасываем использованные ловушки
+        this.usedTraps.clear();
+        
+        // Проверка, что путь от старта до финиша существует
+        this.ensurePathExists();
+        
+        return this;
     }
 } 

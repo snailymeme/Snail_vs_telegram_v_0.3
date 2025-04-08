@@ -796,9 +796,20 @@ class Snail {
         
         // Обновляем состояние застревания
         if (this.stuck) {
-            // Добавляем класс для CSS анимации
-            if (this.element) {
-                this.element.classList.add('stuck');
+            // Уменьшаем оставшееся время застревания
+            this.stuckTime -= deltaTime;
+            if (this.stuckTime <= 0) {
+                this.stuck = false;
+                console.log(`${this.type} освободился от ловушки`);
+                // Удаляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.remove('stuck');
+                }
+            } else {
+                // Добавляем класс для CSS анимации
+                if (this.element) {
+                    this.element.classList.add('stuck');
+                }
             }
         } else {
             // Удаляем класс для CSS анимации
@@ -917,34 +928,44 @@ class Snail {
     }
     
     /**
-     * Проверка специальных ячеек (ловушки, ускорители)
+     * Проверка наличия специальных ячеек по текущей позиции
      */
     checkSpecialCells() {
-        try {
-            if (!this.maze || !this.maze.getCellType) {
-                console.warn(`Не удалось проверить специальные ячейки - метод getCellType не найден в maze`);
-                return;
-            }
-            
-            const cellType = this.maze.getCellType(this.row, this.col);
-            if (!cellType) return;
-            
-            // Используем константы из ASSETS
-            switch (cellType) {
-                case ASSETS.CELL_TYPES.TRAP:
-                    // Улитка попала в ловушку
-                    this.disoriented = true;
-                    this.disorientedTime = 3000; // 3 секунды дезориентации
-                    console.log(`${this.name} попал в ловушку!`);
-                    break;
-                    
-                case ASSETS.CELL_TYPES.BOOST:
-                    // Улитка получила ускорение
-                    this.activateTurboBoost();
-                    break;
-            }
-        } catch (error) {
-            console.error(`Ошибка при проверке специальных ячеек для улитки ${this.type}:`, error);
+        const cellType = this.maze.getCell(this.row, this.col);
+        
+        // Если улитка закончила гонку, дальше не обрабатываем
+        if (this.hasFinished) return;
+        
+        switch (cellType) {
+            case ASSETS.CELL_TYPES.FINISH:
+                this.finish();
+                break;
+                
+            case ASSETS.CELL_TYPES.TRAP:
+                // Улитка попала в ловушку - останавливается на случайное время от 2 до 4 секунд
+                console.log(`${this.type} попала в ловушку на ${this.row},${this.col}`);
+                this.stuck = true;
+                // Случайное время от 2000 до 4000 мс
+                this.stuckTime = 2000 + Math.random() * 2000;
+                console.log(`${this.type} будет в ловушке ${(this.stuckTime/1000).toFixed(1)} секунд`);
+                
+                // Отмечаем ловушку как использованную (одноразовая)
+                this.maze.markTrapAsUsed(this.row, this.col);
+                break;
+                
+            case ASSETS.CELL_TYPES.BOOST:
+                // Улитка получает ускорение
+                console.log(`${this.type} получила ускорение на ${this.row},${this.col}`);
+                this.activateTurboBoost();
+                
+                // Отмечаем ускоритель как использованный (одноразовый)
+                this.maze.markTrapAsUsed(this.row, this.col);
+                break;
+                
+            case ASSETS.CELL_TYPES.PORTAL:
+                // TODO: Телепортация в случайное место лабиринта
+                // this.teleport();
+                break;
         }
     }
     

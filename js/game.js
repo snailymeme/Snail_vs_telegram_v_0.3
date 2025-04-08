@@ -259,46 +259,71 @@ class Game {
      * Инициализация обработчиков событий
      */
     initEventListeners() {
-        // Обработчики для экрана выбора улитки
+        // Обработчик для опций выбора улитки
         this.snailOptions.forEach(option => {
             option.addEventListener('click', () => {
-                // Удаляем класс selected со всех улиток
+                // Воспроизводим звук щелчка
+                this.playSound(ASSETS.SOUNDS.CLICK);
+                
+                // Удаляем класс selected со всех опций
                 this.snailOptions.forEach(opt => opt.classList.remove('selected'));
                 
-                // Добавляем класс selected к выбранной улитке
+                // Добавляем класс selected выбранной опции
                 option.classList.add('selected');
                 
                 // Запоминаем выбранный тип улитки
-                this.selectedSnailType = option.dataset.snailType;
+                const snailType = option.getAttribute('data-snail-type');
                 
-                console.log(`Выбрана улитка типа: ${this.selectedSnailType}`);
+                if (snailType) {
+                    this.selectedSnailType = snailType;
+                    console.log(`Выбрана улитка типа: ${snailType}`);
+                } else {
+                    console.error('Не удалось определить тип улитки из атрибута data-snail-type');
+                }
             });
         });
         
-        // Обработчик изменения ставки
-        this.betAmount.addEventListener('input', () => {
-            const value = parseInt(this.betAmount.value);
-            
-            // Проверка валидности значения
-            if (isNaN(value) || value < ASSETS.GAME.MIN_BET) {
-                this.setBet(ASSETS.GAME.MIN_BET);
-            } else if (value > Math.min(ASSETS.GAME.MAX_BET, this.balance)) {
-                this.setBet(Math.min(ASSETS.GAME.MAX_BET, this.balance));
-            } else {
-                this.setBet(value);
-            }
-        });
+        // Обработчик для поля ввода ставки
+        if (this.betAmount) {
+            this.betAmount.addEventListener('change', () => {
+                this.setBet(parseInt(this.betAmount.value, 10));
+            });
+        }
         
-        // Обработчик кнопки начала гонки
-        this.startRaceButton.addEventListener('click', () => {
-            this.startRace();
-        });
+        // Обработчик для кнопки начала гонки
+        if (this.startRaceButton) {
+            this.startRaceButton.addEventListener('click', () => {
+                // Воспроизводим звук щелчка
+                this.playSound(ASSETS.SOUNDS.CLICK);
+                
+                // Проверяем, выбрана ли улитка
+                if (!this.selectedSnailType) {
+                    alert('Пожалуйста, выберите улитку для гонки!');
+                    return;
+                }
+                
+                // Проверяем, достаточно ли баланса
+                if (this.balance < this.bet) {
+                    alert('Недостаточно средств для ставки!');
+                    return;
+                }
+                
+                // Запускаем гонку
+                this.startRace();
+            });
+        }
         
         this.backToSelectionButton.addEventListener('click', () => {
+            // Воспроизводим звук щелчка
+            this.playSound(ASSETS.SOUNDS.CLICK);
+            
             this.showSelectionScreen();
         });
         
         this.playAgainButton.addEventListener('click', () => {
+            // Воспроизводим звук щелчка
+            this.playSound(ASSETS.SOUNDS.CLICK);
+            
             this.showSelectionScreen();
         });
         
@@ -533,8 +558,8 @@ class Game {
         // Обновляем отображение ставки
         this.currentBetDisplay.textContent = this.bet;
         
-        // Создаем аудио для обратного отсчета
-        const raceStartSound = new Audio('mp3/race_start.mp3');
+        // Воспроизводим звук начала гонки
+        this.playSound(ASSETS.SOUNDS.RACE_START);
         
         // Создаем элемент для отображения обратного отсчета
         const countdownEl = document.createElement('div');
@@ -580,9 +605,6 @@ class Game {
         
         // Запускаем обратный отсчет
         animateNumber('3');
-        
-        // Воспроизводим звук обратного отсчета
-        raceStartSound.play();
         
         // Через 1 секунду показываем 2
         setTimeout(() => {
@@ -681,41 +703,60 @@ class Game {
     /**
      * Обработка завершения гонки
      */
-    handleRaceFinished(data) {
-        const { finishedSnails } = data;
+    handleRaceFinished(results) {
+        // Останавливаем активную гонку
+        this.isRaceActive = false;
         
-        // Получаем улитку игрока
-        const playerSnail = this.snailManager.playerSnail;
-        
-        // Определяем место улитки игрока
-        const playerPosition = playerSnail.finishPosition;
-        
-        // Рассчитываем выигрыш в зависимости от места
-        let winAmount = 0;
-        let message = '';
-        
-        if (playerPosition === 1) {
-            // Первое место
-            winAmount = Math.floor(this.bet * ASSETS.GAME.WINNING_MULTIPLIER);
-            message = `Поздравляем! Ваша улитка заняла 1 место! Вы выиграли ${winAmount} монет!`;
-        } else if (playerPosition === 2) {
-            // Второе место
-            winAmount = Math.floor(this.bet * ASSETS.GAME.SECOND_PLACE_MULTIPLIER);
-            message = `Неплохо! Ваша улитка заняла 2 место. Вы выиграли ${winAmount} монет.`;
-        } else if (playerPosition > 0) {
-            // Другие места
-            message = `Ваша улитка заняла ${playerPosition} место. Попробуйте еще раз!`;
-        } else {
-            // Не финишировала
-            message = 'Ваша улитка не смогла финишировать. Попробуйте еще раз!';
+        // Очищаем таймаут завершения гонки
+        if (this.raceTimeout) {
+            clearTimeout(this.raceTimeout);
+            this.raceTimeout = null;
         }
         
-        // Отображаем сообщение
-        this.resultsMessage.textContent = message;
+        // Получаем позицию улитки игрока
+        const playerPosition = results.find(result => result.type === this.selectedSnailType)?.position || 0;
         
-        // Обновляем баланс
-        this.balance += winAmount;
-        this.updateBalanceDisplay();
+        // Определяем, выиграл ли игрок
+        const isWinner = playerPosition === 1;
+        
+        // Воспроизводим звук завершения гонки
+        this.playSound(ASSETS.SOUNDS.FINISH);
+        
+        // Обновляем баланс в зависимости от результата
+        if (isWinner) {
+            // Игрок выиграл, применяем множитель выигрыша
+            const winnings = Math.floor(this.bet * ASSETS.GAME.WINNING_MULTIPLIER);
+            this.balance += winnings;
+            
+            // Выводим сообщение о выигрыше
+            this.resultsMessage.innerHTML = `
+                <div class="win-message">Вы выиграли!</div>
+                <div class="win-amount">+${winnings} монет</div>
+            `;
+            this.resultsMessage.classList.add('win');
+            this.resultsMessage.classList.remove('lose');
+        } else if (playerPosition === 2) {
+            // Игрок занял второе место, возвращаем часть ставки
+            const refund = Math.floor(this.bet * ASSETS.GAME.SECOND_PLACE_MULTIPLIER);
+            this.balance += refund;
+            
+            // Выводим сообщение о возврате части ставки
+            this.resultsMessage.innerHTML = `
+                <div class="partial-win-message">Ваша улитка на 2 месте</div>
+                <div class="partial-win-amount">+${refund} монет</div>
+            `;
+            this.resultsMessage.classList.add('partial-win');
+            this.resultsMessage.classList.remove('win');
+            this.resultsMessage.classList.remove('lose');
+        } else {
+            // Игрок проиграл
+            this.resultsMessage.innerHTML = `
+                <div class="lose-message">Вы проиграли!</div>
+                <div class="lose-amount">-${this.bet} монет</div>
+            `;
+            this.resultsMessage.classList.add('lose');
+            this.resultsMessage.classList.remove('win');
+        }
         
         // Отображаем все позиции
         this.displayRacePositions(finishedSnails);
@@ -1044,5 +1085,17 @@ class Game {
             [array[i], array[j]] = [array[j], array[i]];
         }
         return array;
+    }
+    
+    /**
+     * Воспроизведение звука
+     * @param {string} soundPath - путь к звуковому файлу
+     */
+    playSound(soundPath) {
+        if (!soundPath) return;
+        
+        const audio = new Audio(soundPath);
+        audio.volume = 0.4; // Громкость на 40%
+        audio.play().catch(e => console.error('Ошибка воспроизведения звука:', e));
     }
 } 

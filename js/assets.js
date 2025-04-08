@@ -19,6 +19,16 @@ const GAME_ASSETS = {
         }
     },
     
+    // Звуковые эффекты
+    SOUNDS: {
+        CLICK: 'mp3/click.mp3',
+        BOMB: 'mp3/bomb.mp3',
+        ROCKET: 'mp3/rocket.mp3',
+        FINISH: 'mp3/finish.mp3',
+        RACE_START: 'mp3/race_start.mp3',
+        RACE_MUSIC: 'mp3/musik.mp3'
+    },
+    
     // Типы ячеек лабиринта
     CELL_TYPES: {
         WALL: 1,
@@ -182,7 +192,13 @@ const GAME_ASSETS = {
         'images/wall_texture.png',
         'images/path_texture.png',
         'images/start.png',
-        'images/finish.png'
+        'images/finish.png',
+        'mp3/click.mp3',
+        'mp3/bomb.mp3',
+        'mp3/rocket.mp3',
+        'mp3/finish.mp3',
+        'mp3/race_start.mp3',
+        'mp3/musik.mp3'
     ],
     
     /**
