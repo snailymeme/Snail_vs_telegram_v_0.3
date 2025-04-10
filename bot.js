@@ -72,6 +72,9 @@ try {
         // Middleware для парсинга JSON
         app.use(express.json());
         
+        // Обслуживание статических файлов из корневой директории
+        app.use(express.static('./'));
+        
         // Инициализируем бота без polling
         bot = new TelegramBot(CONFIG.botToken, { polling: false });
         
@@ -90,7 +93,7 @@ try {
         
         // Простой ответ для проверки работоспособности
         app.get('/', (req, res) => {
-            res.send('Telegram Bot Server is running!');
+            res.sendFile('index.html', { root: './' });
         });
         
         // Запускаем сервер
