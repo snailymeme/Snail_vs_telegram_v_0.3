@@ -118,16 +118,18 @@ try {
  */
 async function sendWelcomeMessage(chatId) {
     try {
-        // Создаем клавиатуру с кнопкой запуска Web App
+        // Создаем клавиатуру с обычной кнопкой, которая будет внизу экрана
         const keyboard = {
-            inline_keyboard: [
+            keyboard: [
                 [
                     {
                         text: '🎮 Играть в Snail to Riches',
                         web_app: { url: CONFIG.gameUrl }
                     }
                 ]
-            ]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: false
         };
 
         // Отправляем сообщение с кнопкой
@@ -155,24 +157,24 @@ bot.onText(/\/help/, async (msg) => {
     const chatId = msg.chat.id;
     log(`Получена команда /help от пользователя ${chatId}`, 'info');
     
-    // Создаем клавиатуру с кнопкой запуска Web App
+    // Используем такую же клавиатуру как в приветственном сообщении
     const keyboard = {
-        inline_keyboard: [
+        keyboard: [
             [
                 {
                     text: '🎮 Играть в Snail to Riches',
                     web_app: { url: CONFIG.gameUrl }
                 }
             ]
-        ]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: false
     };
     
     const helpMessage = `🐌 *Snail to Riches - Помощь* 🐌
 
 /start - Показать кнопку для запуска игры
-/help - Показать это сообщение
-
-Нажмите на кнопку ниже, чтобы открыть игру прямо в Telegram:`;
+/help - Показать это сообщение`;
 
     await bot.sendMessage(chatId, helpMessage, { 
         parse_mode: 'Markdown',
