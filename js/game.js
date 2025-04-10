@@ -949,7 +949,7 @@ class Game {
             const snailName = snailNames[snail.type] || snail.type;
             
             // Форматируем время прохождения
-            const timeStr = this.formatTime(snail.finishTime - this.raceStartTime);
+            const timeStr = this.formatRaceTime(snail.finishTime - this.raceStartTime);
             
             row.innerHTML = `
                 <span class="position-cell ${positionClass}">${position}</span>
@@ -959,6 +959,17 @@ class Game {
             
             this.racePositions.appendChild(row);
         });
+    }
+    
+    /**
+     * Форматирует время гонки в читаемый формат
+     * @param {number} timeMs - Время в миллисекундах
+     * @returns {string} Отформатированное время
+     */
+    formatRaceTime(timeMs) {
+        const seconds = Math.floor(timeMs / 1000);
+        const milliseconds = Math.floor((timeMs % 1000) / 10).toString().padStart(2, '0');
+        return `${seconds}.${milliseconds}s`;
     }
     
     /**
