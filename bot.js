@@ -16,6 +16,7 @@ const CONFIG = {
     
     // Порт для веб-хука и сервера
     port: process.env.PORT || 443,
+    botPort: process.env.BOT_PORT || 3000, // Внутренний порт для бота
     
     // URL вашей игры
     gameUrl: process.env.SERVER_URL || 'https://snail-vs-telegram-v-0-3-production.up.railway.app',
@@ -24,7 +25,7 @@ const CONFIG = {
     webhookUrl: process.env.WEBHOOK_URL || 'https://snail-vs-telegram-v-0-3-production.up.railway.app/bot',
     
     // Использовать ли веб-хук (вместо polling)
-    useWebhook: true
+    useWebhook: true // Включаем webhook для работы на Railway
 };
 
 // ========== ЛОГГИРОВАНИЕ ==========
@@ -46,6 +47,17 @@ if (!CONFIG.botToken) {
     log('TELEGRAM_BOT_TOKEN не установлен! Убедитесь, что токен указан в .env файле.', 'error');
     process.exit(1);
 }
+
+// ========== ИНФОРМАЦИЯ О КОНФИГУРАЦИИ ==========
+console.log('==========================================================');
+console.log('КОНФИГУРАЦИЯ TELEGRAM БОТА:');
+console.log(`Токен: ${CONFIG.botToken ? CONFIG.botToken.substring(0, 10) + '...' : 'Не задан'}`);
+console.log(`Режим: ${CONFIG.useWebhook ? 'Webhook' : 'Long Polling'}`);
+console.log(`URL игры: ${CONFIG.gameUrl}`);
+console.log(`Webhook URL: ${CONFIG.webhookUrl}`);
+console.log(`Внешний порт: ${CONFIG.port}, Внутренний порт: ${CONFIG.botPort}`);
+console.log(`Режим окружения: ${process.env.NODE_ENV || 'development'}`);
+console.log('==========================================================');
 
 // ========== ИНИЦИАЛИЗАЦИЯ БОТА ==========
 let bot;
@@ -82,12 +94,15 @@ try {
         });
         
         // Запускаем сервер
-        app.listen(CONFIG.port, () => {
-            log(`Express сервер запущен на порту ${CONFIG.port}`, 'success');
+        const serverPort = CONFIG.botPort || CONFIG.port;
+        app.listen(serverPort, () => {
+            log(`Express сервер запущен на порту ${serverPort}`, 'success');
+            log(`Внешний порт: ${CONFIG.port}, внутренний порт: ${serverPort}`, 'info');
             log(`Используется URL игры: ${CONFIG.gameUrl}`, 'info');
         });
     } else {
         // Используем режим polling (для тестирования)
+        console.log('Запускаем бота в режиме Long Polling...');
         bot = new TelegramBot(CONFIG.botToken, { polling: true });
         log('Telegram Bot успешно инициализирован в режиме polling', 'success');
         log(`Используется URL игры: ${CONFIG.gameUrl}`, 'info');

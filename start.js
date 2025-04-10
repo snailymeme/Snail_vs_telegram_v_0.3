@@ -22,7 +22,13 @@ const MODE = args.find(arg => arg.startsWith('--mode='))?.split('=')[1] || 'full
 const CLEAN = args.includes('--clean');
 const HELP = args.includes('--help') || args.includes('-h');
 const VERBOSE = args.includes('--verbose') || args.includes('-v');
-const NO_NGROK = args.includes('--no-ngrok');
+const NO_NGROK = args.includes('--no-ngrok') || process.env.NODE_ENV === 'production';
+
+// Railway переменные
+const IS_RAILWAY = process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_SERVICE_ID;
+
+// Определяем режим работы на основе окружения
+const EFFECTIVE_MODE = IS_RAILWAY ? 'bot' : MODE;
 
 // Глобальные переменные для портов и процессов
 global.httpPort = null;
@@ -48,7 +54,8 @@ function log(message, type = 'info', force = true) {
         error: '❌',
         warning: '⚠️',
         start: '🚀',
-        cleanup: '🧹'
+        cleanup: '🧹',
+        railway: '🚂'
     };
     
     const prefix = prefixes[type] || '•';
@@ -474,7 +481,15 @@ async function main() {
         console.log('========================================');
         console.log('🐌 Snail to Riches - Запуск приложения');
         console.log('========================================');
-        console.log(`Режим: ${MODE}, Очистка: ${CLEAN ? 'Да' : 'Нет'}`);
+        
+        if (IS_RAILWAY) {
+            log('Запуск на платформе Railway обнаружен', 'railway');
+            log(`Railway Static URL: ${process.env.RAILWAY_STATIC_URL || 'Не установлен'}`, 'railway');
+            log(`Railway Service ID: ${process.env.RAILWAY_SERVICE_ID || 'Не установлен'}`, 'railway');
+            log(`PORT: ${process.env.PORT || 'По умолчанию'}`, 'railway');
+        }
+        
+        console.log(`Режим: ${EFFECTIVE_MODE}, Очистка: ${CLEAN ? 'Да' : 'Нет'}`);
         
         // Показываем справку если запрошена
         if (HELP) {
@@ -497,7 +512,7 @@ async function main() {
         }
         
         // Запуск в зависимости от режима
-        switch (MODE) {
+        switch (EFFECTIVE_MODE) {
             case 'full':
                 // Запускаем все компоненты
                 serverProcess = await startServer();
@@ -511,8 +526,14 @@ async function main() {
                 break;
                 
             case 'bot':
-                // Только бот
-                botProcess = await startBot();
+                // В Railway запускаем только бот с настройками из переменных окружения
+                if (IS_RAILWAY) {
+                    log('Запуск в режиме Railway: только бот', 'railway');
+                    botProcess = await startBot();
+                } else {
+                    // Только бот
+                    botProcess = await startBot();
+                }
                 break;
                 
             case 'ngrok':
@@ -521,7 +542,7 @@ async function main() {
                 break;
                 
             default:
-                log(`Неизвестный режим: ${MODE}`, 'error');
+                log(`Неизвестный режим: ${EFFECTIVE_MODE}`, 'error');
                 process.exit(1);
         }
         
@@ -530,6 +551,8 @@ async function main() {
         log('Компоненты успешно запущены!', 'success');
         if (ngrokData?.url) {
             log(`URL приложения: ${ngrokData.url}`, 'success');
+        } else if (process.env.SERVER_URL) {
+            log(`URL приложения: ${process.env.SERVER_URL}`, 'success');
         }
         console.log('========================================');
         
