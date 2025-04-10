@@ -1,0 +1,18 @@
+# Настройки Telegram бота
+BOT_TOKEN=ваш_токен_бота
+ADMIN_CHAT_ID=ваш_telegram_id
+
+# Настройки сервера
+PORT=8001
+HOST=localhost
+PROTOCOL=http
+
+# Настройки Ngrok (для туннелирования)
+NGROK_AUTH_TOKEN=ваш_токен_ngrok
+
+# Настройки Solana
+SOLANA_NETWORK=devnet
+SOLANA_PRIVATE_KEY=ваш_приватный_ключ_solana
+
+# Режим разработки
+DEBUG=true

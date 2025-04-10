@@ -5,6 +5,8 @@
 
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
+const express = require('express');
+const cors = require('cors');
 require('dotenv').config();
 
 // ========== КОНФИГУРАЦИЯ ==========
@@ -12,14 +14,17 @@ const CONFIG = {
     // Получаем токен из переменных окружения
     botToken: process.env.TELEGRAM_BOT_TOKEN,
     
-    // URL вашей игры (локальный тестовый)
-    gameUrl: 'http://localhost:8001',
+    // Порт для веб-хука и сервера
+    port: process.env.PORT || 443,
     
-    // Файл с URL ngrok - отключаем, используем локальный URL
-    ngrokUrlFile: 'ngrok-url.txt',
+    // URL вашей игры
+    gameUrl: process.env.SERVER_URL || 'https://snail-vs-telegram-v-0-3-production.up.railway.app',
     
-    // Использовать ли ngrok URL
-    useNgrok: false
+    // URL для веб-хука
+    webhookUrl: process.env.WEBHOOK_URL || 'https://snail-vs-telegram-v-0-3-production.up.railway.app/bot',
+    
+    // Использовать ли веб-хук (вместо polling)
+    useWebhook: true
 };
 
 // ========== ЛОГГИРОВАНИЕ ==========
@@ -36,32 +41,6 @@ function log(message, level = 'info') {
     console.log(`${prefix} [${timestamp}] ${message}`);
 }
 
-// ========== ПОЛУЧЕНИЕ NGROK URL ==========
-function getNgrokUrl() {
-    // Если отключено использование ngrok, возвращаем локальный URL
-    if (!CONFIG.useNgrok) {
-        log(`Используется локальный URL: ${CONFIG.gameUrl}`, 'info');
-        return CONFIG.gameUrl;
-    }
-    
-    try {
-        if (fs.existsSync(CONFIG.ngrokUrlFile)) {
-            const url = fs.readFileSync(CONFIG.ngrokUrlFile, 'utf8').trim();
-            log(`Получен URL из файла: ${url}`, 'success');
-            return url;
-        } else {
-            log(`Файл ${CONFIG.ngrokUrlFile} не найден, используется локальный URL`, 'warning');
-        }
-    } catch (error) {
-        log(`Ошибка при чтении файла URL: ${error.message}`, 'error');
-    }
-    
-    return CONFIG.gameUrl;
-}
-
-// Получаем URL для игры
-CONFIG.gameUrl = getNgrokUrl();
-
 // ========== ПРОВЕРКА КОНФИГУРАЦИИ ==========
 if (!CONFIG.botToken) {
     log('TELEGRAM_BOT_TOKEN не установлен! Убедитесь, что токен указан в .env файле.', 'error');
@@ -71,9 +50,48 @@ if (!CONFIG.botToken) {
 // ========== ИНИЦИАЛИЗАЦИЯ БОТА ==========
 let bot;
 try {
-    bot = new TelegramBot(CONFIG.botToken, { polling: true });
-    log('Telegram Bot успешно инициализирован', 'success');
-    log(`Используется URL игры: ${CONFIG.gameUrl}`, 'info');
+    if (CONFIG.useWebhook) {
+        // Создаем Express приложение для обработки веб-хука
+        const app = express();
+        
+        // Разрешаем CORS для всех источников
+        app.use(cors());
+        
+        // Middleware для парсинга JSON
+        app.use(express.json());
+        
+        // Инициализируем бота без polling
+        bot = new TelegramBot(CONFIG.botToken, { polling: false });
+        
+        // Устанавливаем веб-хук
+        bot.setWebHook(CONFIG.webhookUrl).then(() => {
+            log(`Веб-хук установлен на ${CONFIG.webhookUrl}`, 'success');
+        }).catch(error => {
+            log(`Ошибка установки веб-хука: ${error.message}`, 'error');
+        });
+        
+        // Обработчик для веб-хука
+        app.post('/bot', (req, res) => {
+            bot.processUpdate(req.body);
+            res.sendStatus(200);
+        });
+        
+        // Простой ответ для проверки работоспособности
+        app.get('/', (req, res) => {
+            res.send('Telegram Bot Server is running!');
+        });
+        
+        // Запускаем сервер
+        app.listen(CONFIG.port, () => {
+            log(`Express сервер запущен на порту ${CONFIG.port}`, 'success');
+            log(`Используется URL игры: ${CONFIG.gameUrl}`, 'info');
+        });
+    } else {
+        // Используем режим polling (для тестирования)
+        bot = new TelegramBot(CONFIG.botToken, { polling: true });
+        log('Telegram Bot успешно инициализирован в режиме polling', 'success');
+        log(`Используется URL игры: ${CONFIG.gameUrl}`, 'info');
+    }
 } catch (error) {
     log(`Ошибка инициализации Telegram Bot: ${error.message}`, 'error');
     process.exit(1);
@@ -163,13 +181,21 @@ bot.on('message', async (msg) => {
 // ========== ОБРАБОТКА ЗАВЕРШЕНИЯ РАБОТЫ ==========
 process.on('SIGINT', async () => {
     log('Завершение работы бота...', 'warning');
-    await bot.close();
+    if (CONFIG.useWebhook) {
+        await bot.deleteWebHook();
+    } else {
+        await bot.close();
+    }
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     log('Завершение работы бота...', 'warning');
-    await bot.close();
+    if (CONFIG.useWebhook) {
+        await bot.deleteWebHook();
+    } else {
+        await bot.close();
+    }
     process.exit(0);
 });
 

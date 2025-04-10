@@ -222,8 +222,8 @@ async function startServer() {
     log('Запуск HTTP сервера...', 'start');
     
     try {
-        // Находим свободный порт, начиная с предпочитаемого порта 3000
-        const httpPort = await findFreePort(3000);
+        // Используем порт из переменной окружения или 3000 по умолчанию
+        const httpPort = process.env.PORT || 3000;
         
         // Сохраняем порт в глобальных переменных
         global.httpPort = httpPort;
@@ -283,17 +283,26 @@ async function startServer() {
  * @returns {Promise<object>} Объект с процессом и URL ngrok
  */
 async function startNgrok() {
-    // Если указан флаг NO_NGROK, пропускаем запуск ngrok
-    if (NO_NGROK) {
-        log('Запуск ngrok отключен флагом --no-ngrok', 'info');
+    // Проверяем, не находимся ли мы в production окружении
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                          !!process.env.SERVER_URL;
+    
+    // В production режиме или если указан флаг NO_NGROK, пропускаем запуск ngrok
+    if (isProduction || NO_NGROK) {
+        log('Запуск ngrok отключен (production окружение или флаг --no-ngrok)', 'info');
+        
+        // В production используем SERVER_URL из переменных окружения
+        if (isProduction && process.env.SERVER_URL) {
+            log(`Используется URL из переменных окружения: ${process.env.SERVER_URL}`, 'success');
+            return { url: process.env.SERVER_URL };
+        }
+        
+        // Иначе используем локальный URL
+        const localUrl = 'http://localhost:' + (global.httpPort || 8001);
         // Создаем файл с локальным URL
-        fs.writeFileSync(
-            'ngrok-url.txt', 
-            'http://localhost:' + (global.httpPort || 8001),
-            'utf8'
-        );
-        log(`Создан файл с локальным URL: http://localhost:${global.httpPort || 8001}`, 'success');
-        return;
+        fs.writeFileSync('ngrok-url.txt', localUrl, 'utf8');
+        log(`Создан файл с локальным URL: ${localUrl}`, 'success');
+        return { url: localUrl };
     }
     
     log('Запуск ngrok туннеля...', 'start');
@@ -381,15 +390,21 @@ async function startBot(ngrokUrl) {
     log('Запуск Telegram бота...', 'start');
     
     try {
-        // Находим свободный порт, начиная с предпочитаемого порта 3001
-        const botPort = await findFreePort(3001);
+        // Используем порт из переменной окружения или находим свободный
+        const botPort = process.env.BOT_PORT || await findFreePort(3001);
         
         // Сохраняем порт в глобальных переменных
         global.botPort = botPort;
         
         // Создаем переменные окружения для бота
         const env = { ...process.env };
-        if (ngrokUrl) {
+        
+        // Если мы в production, используем SERVER_URL из окружения
+        if (process.env.NODE_ENV === 'production' || process.env.SERVER_URL) {
+            log(`Используется URL из переменных окружения: ${process.env.SERVER_URL}`, 'info');
+        } 
+        // Иначе используем URL из ngrok если он доступен
+        else if (ngrokUrl) {
             env.NGROK_URL = ngrokUrl;
             log(`Передаем URL в бота: ${ngrokUrl}`, 'info', false);
         }
@@ -443,7 +458,7 @@ async function startBot(ngrokUrl) {
         log(`Telegram бот успешно запущен на порту ${botPort}`, 'success');
         return botProcess;
     } catch (error) {
-        log(`Не удалось запустить Telegram бота: ${error.message}`, 'error');
+        log(`Не удалось запустить бота: ${error.message}`, 'error');
         throw error;
     }
 }
