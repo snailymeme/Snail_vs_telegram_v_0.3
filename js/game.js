@@ -27,6 +27,9 @@ class Game {
         
         // Загрузка ресурсов перед началом игры
         this.loadResources();
+        
+        // Рандомизируем типы улиток при первой загрузке
+        this.randomizeSnailTypes();
     }
     
     /**
@@ -303,9 +306,10 @@ class Game {
         }
         
         // При загрузке игры рандомизируем улиток
-        document.addEventListener('DOMContentLoaded', () => {
-            this.randomizeSnailTypes();
-        });
+        // Закомментировано, так как рандомизация происходит в конструкторе
+        // document.addEventListener('DOMContentLoaded', () => {
+        //     this.randomizeSnailTypes();
+        // });
         
         // Рандомизация при возврате к экрану выбора
         this.backToSelectionButton.addEventListener('click', () => {
