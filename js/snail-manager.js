@@ -392,8 +392,16 @@ class SnailManager {
         // Увеличиваем счетчик финишировавших
         this.finishedCount++;
         
+        // Сохраняем время прохождения улиткой дистанции (от старта гонки)
+        if (!snail.finishTime) {
+            // Используем абсолютное время для корректного сравнения
+            snail.finishTime = Date.now();
+            console.log(`Улитка ${snail.type} финишировала за ${snail.finishTime - this.raceStartTime}мс`);
+        }
+        
         // Устанавливаем позицию улитки на финише
         snail.finishPosition = this.finishedCount;
+        snail.position = this.finishedCount;
         
         // Добавляем в список финишировавших
         this.finishedSnails.push(snail);
@@ -436,39 +444,169 @@ class SnailManager {
         // Останавливаем фоновую музыку
         this.stopBackgroundMusic();
         
-        // Определяем текущие позиции улиток и их близость к финишу
+        // Определяем координаты финиша
         const finishRow = this.maze.finish.row;
         const finishCol = this.maze.finish.col;
         
-        // Для неподвижных улиток имитируем завершение
+        // Вычисляем потенциальные пути для всех улиток
         const snailsToFinish = [...this.snails];
         
-        // Сортируем улиток по близости к финишу
-        // Рассчитываем дистанцию до финиша для каждой улитки
-        snailsToFinish.forEach(snail => {
+        // Сначала для всех улиток пытаемся найти путь до финиша через алгоритм поиска пути
+        for (const snail of snailsToFinish) {
             if (!snail.hasFinished) {
-                // Расстояние от улитки до финиша (Манхэттенское расстояние)
-                snail.distanceToFinish = Math.abs(snail.row - finishRow) + Math.abs(snail.col - finishCol);
+                try {
+                    // Инициализируем расстояние как очень большое значение
+                    snail.distanceToFinish = 999999;
+                    
+                    console.log(`Вычисление оптимального пути для улитки ${snail.type} от (${snail.row}, ${snail.col}) до финиша (${finishRow}, ${finishCol})`);
+                    
+                    // Выполняем полноценный поиск пути через лабиринт
+                    const path = this.maze.findPath(
+                        snail.row,
+                        snail.col,
+                        finishRow,
+                        finishCol
+                    );
+                    
+                    if (path && path.length > 0) {
+                        // Настоящий путь найден, используем его длину как точное расстояние
+                        snail.pathToFinish = path;
+                        snail.distanceToFinish = path.length;
+                        console.log(`Улитка ${snail.type}: найден реальный путь длиной ${path.length} ячеек`);
+                    } else {
+                        // Путь не найден (возможно, улитка заблокирована)
+                        // Используем обход всего лабиринта для оценки сложности пути
+                        
+                        // Запускаем обход лабиринта в ширину от текущей позиции улитки
+                        const distances = this.calculateMazeDistances(snail.row, snail.col);
+                        
+                        // Присваиваем большое значение, если путь не найден
+                        if (distances && distances[finishRow] && distances[finishRow][finishCol] !== undefined) {
+                            snail.distanceToFinish = distances[finishRow][finishCol];
+                            console.log(`Улитка ${snail.type}: расстояние через BFS: ${snail.distanceToFinish}`);
+                        } else {
+                            // Если и через BFS не нашли, используем очень большое значение
+                            snail.distanceToFinish = 9999;
+                            console.log(`Улитка ${snail.type}: не удалось найти путь, присвоено максимальное расстояние`);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Ошибка при вычислении пути для улитки ${snail.type}:`, error);
+                    // В случае ошибки используем манхэттенское расстояние как запасной вариант
+                    snail.distanceToFinish = Math.abs(snail.row - finishRow) + Math.abs(snail.col - finishCol);
+                    console.log(`Улитка ${snail.type}: прямое расстояние (резервный метод): ${snail.distanceToFinish}`);
+                }
                 
-                // Сохраняем текущее время как финишное
-                snail.finishTime = Date.now() - this.raceStartTime;
+                // Задаем виртуальное время финиша на основе вычисленного расстояния
+                // Чем дальше до финиша, тем больше виртуальное время
+                const raceTime = ASSETS.GAME.RACE_DURATION_MS || 60000; // 60 секунд
+                const penaltyPerStep = 100; // 100 мс за каждый шаг до финиша
+                
+                // Применяем штрафное время
+                snail.finishTime = Date.now() + (snail.distanceToFinish * penaltyPerStep);
             }
+        }
+        
+        // Сортируем незавершивших улиток по расстоянию до финиша (ближе = лучше)
+        const unfinishedSnails = snailsToFinish
+            .filter(snail => !snail.hasFinished)
+            .sort((a, b) => a.distanceToFinish - b.distanceToFinish);
+        
+        console.log("Улитки, не успевшие финишировать (отсортированы по расстоянию):");
+        unfinishedSnails.forEach(snail => {
+            console.log(`${snail.type}: ${snail.distanceToFinish} шагов до финиша`);
         });
         
-        // Сортируем невинишировавших улиток по близости к финишу (ближе = лучше)
-        const unfinishedSnails = snailsToFinish.filter(snail => !snail.hasFinished)
-                                             .sort((a, b) => a.distanceToFinish - b.distanceToFinish);
-        
-        // Устанавливаем позиции для неподвижных улиток
+        // Устанавливаем позиции для невинишировавших улиток
         let nextPosition = this.finishedCount + 1;
         unfinishedSnails.forEach(snail => {
-            snail.finish(nextPosition, true); // Передаем true для флага автоматического финиша
+            // Для отображения времени используем формат 60с + пенальти в зависимости от расстояния
+            const baseTime = 60; // 60 секунд для всех невинишировавших
+            // Расчет штрафного времени: делаем более заметным различие между улитками
+            // Для наглядности используем умножение на 0.1, чтобы дать разницу в десятых долях секунды
+            const distancePenalty = (snail.distanceToFinish * 0.1).toFixed(2);
+            
+            // Устанавливаем специальное время финиша для отображения
+            // Формат: 60.xx, где xx - штрафное время на основе расстояния
+            const paddedPenalty = distancePenalty.replace("0.", "").padStart(2, "0");
+            snail.displayFinishTime = `${baseTime}.${paddedPenalty}s`;
+            
+            console.log(`Улитка ${snail.type} получает время: ${snail.displayFinishTime} (расстояние: ${snail.distanceToFinish})`);
+            
+            // Финишируем улитку с отметкой автоматического финиша
+            snail.finish(nextPosition, true);
             this.finishedSnails.push(snail);
             nextPosition++;
         });
         
         // Отправляем событие о завершении гонки
         this.sendRaceFinishedEvent();
+    }
+    
+    /**
+     * Вычисляет расстояния от указанной точки до всех доступных ячеек лабиринта
+     * используя алгоритм поиска в ширину (BFS)
+     * @param {number} startRow - Начальная строка
+     * @param {number} startCol - Начальный столбец
+     * @returns {Object} Массив расстояний до всех ячеек
+     */
+    calculateMazeDistances(startRow, startCol) {
+        if (!this.maze || !this.maze.grid) {
+            console.error("Лабиринт не инициализирован");
+            return null;
+        }
+        
+        // Создаем двумерный массив для хранения расстояний
+        const distances = Array(this.maze.grid.length)
+            .fill()
+            .map(() => Array(this.maze.grid[0].length).fill(Infinity));
+        
+        // Инициализируем расстояние до начальной точки как 0
+        distances[startRow][startCol] = 0;
+        
+        // Очередь для BFS: [строка, столбец, расстояние]
+        const queue = [[startRow, startCol, 0]];
+        
+        // Обработанные ячейки
+        const visited = new Set(`${startRow},${startCol}`);
+        
+        // Направления для перемещения (вверх, вправо, вниз, влево)
+        const directions = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+        
+        // Проходим, пока есть ячейки в очереди
+        while (queue.length > 0) {
+            // Берем первую ячейку из очереди
+            const [row, col, distance] = queue.shift();
+            
+            // Проверяем все соседние ячейки
+            for (const [dRow, dCol] of directions) {
+                const newRow = row + dRow;
+                const newCol = col + dCol;
+                
+                // Проверяем, что ячейка в пределах лабиринта
+                if (
+                    newRow >= 0 && 
+                    newRow < this.maze.grid.length && 
+                    newCol >= 0 && 
+                    newCol < this.maze.grid[0].length
+                ) {
+                    // Проверяем, что ячейка не стена и мы еще не посещали ее
+                    const cellValue = this.maze.grid[newRow][newCol];
+                    const key = `${newRow},${newCol}`;
+                    
+                    if (cellValue !== 1 && !visited.has(key)) { // 1 - это стена в лабиринте
+                        // Обновляем расстояние
+                        distances[newRow][newCol] = distance + 1;
+                        // Отмечаем ячейку как посещенную
+                        visited.add(key);
+                        // Добавляем в очередь для проверки ее соседей
+                        queue.push([newRow, newCol, distance + 1]);
+                    }
+                }
+            }
+        }
+        
+        return distances;
     }
     
     /**

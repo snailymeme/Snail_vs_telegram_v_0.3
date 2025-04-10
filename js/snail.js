@@ -681,7 +681,8 @@ class Snail {
         
         // Устанавливаем время финиша, если оно еще не установлено
         if (!this.finishTime || this.finishTime <= 0) {
-            this.finishTime = Date.now() - this.lastMoveTime;
+            // Используем текущее время для корректного сравнения
+            this.finishTime = Date.now();
         }
         
         // Добавляем эффект для финиша
@@ -707,6 +708,7 @@ class Snail {
         if (isAutoFinish) {
             console.log(`${this.name} автоматически финишировал на позиции ${position}! Расстояние до финиша: ${this.distanceToFinish}`);
         } else {
+            // Выводим правильную информацию о времени - теперь это время с начала гонки, а не относительно lastMoveTime
             console.log(`${this.name} финишировал на позиции ${position}! Время: ${this.finishTime}мс`);
         }
     }
