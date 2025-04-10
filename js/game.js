@@ -259,27 +259,16 @@ class Game {
      * Инициализация обработчиков событий
      */
     initEventListeners() {
-        // Обработчик для опций выбора улитки
+        // Обработчики для экрана выбора
         this.snailOptions.forEach(option => {
             option.addEventListener('click', () => {
-                // Воспроизводим звук щелчка
-                this.playSound(ASSETS.SOUNDS.CLICK);
-                
-                // Удаляем класс selected со всех опций
-                this.snailOptions.forEach(opt => opt.classList.remove('selected'));
-                
-                // Добавляем класс selected выбранной опции
+                // Убираем выделение с предыдущей выбранной улитки
+                this.snailOptions.forEach(o => o.classList.remove('selected'));
+                // Выделяем выбранную улитку
                 option.classList.add('selected');
-                
-                // Запоминаем выбранный тип улитки
-                const snailType = option.getAttribute('data-snail-type');
-                
-                if (snailType) {
-                    this.selectedSnailType = snailType;
-                    console.log(`Выбрана улитка типа: ${snailType}`);
-                } else {
-                    console.error('Не удалось определить тип улитки из атрибута data-snail-type');
-                }
+                // Сохраняем тип выбранной улитки
+                this.selectedSnailType = option.dataset.snailType;
+                console.log(`Выбрана улитка: ${this.selectedSnailType}`);
             });
         });
         
@@ -313,18 +302,23 @@ class Game {
             });
         }
         
-        this.backToSelectionButton.addEventListener('click', () => {
-            // Воспроизводим звук щелчка
-            this.playSound(ASSETS.SOUNDS.CLICK);
-            
-            this.showSelectionScreen();
+        // При загрузке игры рандомизируем улиток
+        document.addEventListener('DOMContentLoaded', () => {
+            this.randomizeSnailTypes();
         });
         
-        this.playAgainButton.addEventListener('click', () => {
-            // Воспроизводим звук щелчка
-            this.playSound(ASSETS.SOUNDS.CLICK);
-            
+        // Рандомизация при возврате к экрану выбора
+        this.backToSelectionButton.addEventListener('click', () => {
+            this.hideAllScreens();
             this.showSelectionScreen();
+            this.randomizeSnailTypes();
+        });
+        
+        // Рандомизация при повторной игре
+        this.playAgainButton.addEventListener('click', () => {
+            this.hideAllScreens();
+            this.showSelectionScreen();
+            this.randomizeSnailTypes();
         });
         
         // Добавляем скрытые функции масштабирования
@@ -848,8 +842,8 @@ class Game {
             
             // Выводим сообщение о выигрыше
             this.resultsMessage.innerHTML = `
-                <div class="win-message">Вы выиграли!</div>
-                <div class="win-amount">+${winnings} монет (x5)</div>
+                <div class="win-message">You win!</div>
+                <div class="win-amount">+${winnings} coins (x5)</div>
             `;
             this.resultsMessage.classList.add('win');
             this.resultsMessage.classList.remove('lose');
@@ -861,8 +855,8 @@ class Game {
             
             // Выводим сообщение о возврате части ставки
             this.resultsMessage.innerHTML = `
-                <div class="partial-win-message">Ваша улитка на 2 месте</div>
-                <div class="partial-win-amount">+${refund} монет (50% кешбэк)</div>
+                <div class="partial-win-message">Your snail is in 2nd place</div>
+                <div class="partial-win-amount">+${refund} coins (50% cashback)</div>
             `;
             this.resultsMessage.classList.add('partial-win');
             this.resultsMessage.classList.remove('win');
@@ -874,8 +868,8 @@ class Game {
             
             // Выводим сообщение о возврате части ставки
             this.resultsMessage.innerHTML = `
-                <div class="partial-win-message">Ваша улитка на 3 месте</div>
-                <div class="partial-win-amount">+${refund} монет (25% кешбэк)</div>
+                <div class="partial-win-message">Your snail is in 3rd place</div>
+                <div class="partial-win-amount">+${refund} coins (25% cashback)</div>
             `;
             this.resultsMessage.classList.add('partial-win');
             this.resultsMessage.classList.remove('win');
@@ -883,8 +877,8 @@ class Game {
         } else {
             // 4-5 места - проигрыш
             this.resultsMessage.innerHTML = `
-                <div class="lose-message">Вы проиграли!</div>
-                <div class="lose-amount">-${this.bet} монет</div>
+                <div class="lose-message">You lose!</div>
+                <div class="lose-amount">-${this.bet} coins</div>
             `;
             this.resultsMessage.classList.add('lose');
             this.resultsMessage.classList.remove('win');
@@ -904,120 +898,67 @@ class Game {
     }
     
     /**
-     * Отображение позиций улиток в таблице результатов
+     * Отображает позиции улиток в гонке
+     * @param {Array} finishedSnails - Массив улиток, финишировавших в гонке
      */
     displayRacePositions(finishedSnails) {
+        if (!this.racePositions) {
+            console.error('Элемент для отображения позиций не найден');
+            return;
+        }
+        
+        // Очищаем содержимое
         this.racePositions.innerHTML = '';
         
-        // Сортируем улиток по позициям
-        const sortedSnails = [...finishedSnails].sort((a, b) => a.position - b.position);
-        
-        // Создаем таблицу с результатами
-        const table = document.createElement('table');
-        table.className = 'race-results-table';
-        
         // Создаем заголовок таблицы
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        
-        // Заголовки столбцов
-        ['Место', 'Улитка', 'Время', 'Приз'].forEach(headerText => {
-            const th = document.createElement('th');
-            th.textContent = headerText;
-            headerRow.appendChild(th);
-        });
-        
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-        
-        // Создаем тело таблицы
-        const tbody = document.createElement('tbody');
-        
-        // Добавляем строки для каждой улитки
-        sortedSnails.forEach(snail => {
-            const row = document.createElement('tr');
-            
-            // Если это улитка игрока, выделяем её
-            if (snail.type === this.selectedSnailType) {
-                row.className = 'player-snail';
-                row.style.fontWeight = 'bold';
-                row.style.backgroundColor = `${snail.color}33`; // Полупрозрачный цвет улитки
-            }
-            
-            // Колонка 1: Место
-            const positionCell = document.createElement('td');
-            positionCell.textContent = snail.position;
-            row.appendChild(positionCell);
-            
-            // Колонка 2: Улитка (имя и тип)
-            const nameCell = document.createElement('td');
-            nameCell.textContent = `${snail.name} (${snail.type})`;
-            row.appendChild(nameCell);
-            
-            // Колонка 3: Время
-            const timeCell = document.createElement('td');
-            timeCell.textContent = `${(snail.finishTime / 1000).toFixed(2)}s`;
-            row.appendChild(timeCell);
-            
-            // Колонка 4: Приз (только для улитки игрока)
-            const prizeCell = document.createElement('td');
-            if (snail.type === this.selectedSnailType) {
-                // Расчет приза в зависимости от места
-                let prizeText = '';
-                if (snail.position === 1) {
-                    const winnings = Math.floor(this.bet * ASSETS.GAME.FIRST_PLACE_MULTIPLIER);
-                    prizeText = `+${winnings} (x5)`;
-                    prizeCell.style.color = '#00c853'; // Зеленый цвет для выигрыша
-                } else if (snail.position === 2) {
-                    const refund = Math.floor(this.bet * ASSETS.GAME.SECOND_PLACE_MULTIPLIER);
-                    prizeText = `+${refund} (50%)`;
-                    prizeCell.style.color = '#2196f3'; // Синий цвет для частичного возврата
-                } else if (snail.position === 3) {
-                    const refund = Math.floor(this.bet * ASSETS.GAME.THIRD_PLACE_MULTIPLIER);
-                    prizeText = `+${refund} (25%)`;
-                    prizeCell.style.color = '#2196f3'; // Синий цвет для частичного возврата
-                } else {
-                    prizeText = `-${this.bet}`;
-                    prizeCell.style.color = '#f44336'; // Красный цвет для проигрыша
-                }
-                prizeCell.textContent = prizeText;
-            } else {
-                prizeCell.textContent = '-';
-            }
-            row.appendChild(prizeCell);
-            
-            tbody.appendChild(row);
-        });
-        
-        table.appendChild(tbody);
-        this.racePositions.appendChild(table);
-        
-        // Добавляем стили для таблицы
-        const style = document.createElement('style');
-        style.textContent = `
-            .race-results-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 15px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .race-results-table th, .race-results-table td {
-                padding: 8px 12px;
-                text-align: center;
-                border: 1px solid #e0e0e0;
-            }
-            .race-results-table th {
-                background-color: #f5f5f5;
-                font-weight: bold;
-            }
-            .race-results-table tr:nth-child(even) {
-                background-color: #f9f9f9;
-            }
-            .race-results-table .player-snail {
-                background-color: rgba(255, 235, 59, 0.1);
-            }
+        const tableHeader = document.createElement('div');
+        tableHeader.className = 'race-table-header';
+        tableHeader.innerHTML = `
+            <span class="position-cell">Place</span>
+            <span class="name-cell">Snail</span>
+            <span class="time-cell">Time</span>
         `;
-        this.racePositions.appendChild(style);
+        this.racePositions.appendChild(tableHeader);
+        
+        // Сопоставление типов улиток с их цветовыми именами
+        const snailNames = {
+            'racer': 'Red',
+            'explorer': 'Blue',
+            'snake': 'Green',
+            'stubborn': 'Purple',
+            'deadender': 'Yellow'
+        };
+        
+        // Добавляем информацию о каждой улитке
+        finishedSnails.forEach((snail, index) => {
+            const position = index + 1;
+            const row = document.createElement('div');
+            row.className = 'race-table-row';
+            
+            // Определяем цвет в зависимости от позиции
+            let positionClass = '';
+            if (position === 1) positionClass = 'gold';
+            else if (position === 2) positionClass = 'silver';
+            else if (position === 3) positionClass = 'bronze';
+            
+            // Определяем, является ли улитка игроком
+            const isPlayer = snail.isPlayer;
+            const playerClass = isPlayer ? 'player-snail' : '';
+            
+            // Получаем цветовое имя улитки
+            const snailName = snailNames[snail.type] || snail.type;
+            
+            // Форматируем время прохождения
+            const timeStr = this.formatTime(snail.finishTime - this.raceStartTime);
+            
+            row.innerHTML = `
+                <span class="position-cell ${positionClass}">${position}</span>
+                <span class="name-cell ${playerClass}">${snailName}${isPlayer ? ' (You)' : ''}</span>
+                <span class="time-cell">${timeStr}</span>
+            `;
+            
+            this.racePositions.appendChild(row);
+        });
     }
     
     /**
@@ -1433,5 +1374,46 @@ class Game {
         audio.play().catch(e => {
             console.error(`Не удалось воспроизвести звук ${soundPath}:`, e);
         });
+    }
+    
+    /**
+     * Рандомизирует типы улиток, меняя их местами
+     */
+    randomizeSnailTypes() {
+        console.log("Рандомизация типов улиток...");
+        
+        // Определяем все типы улиток и их соответствующие данные
+        const snailTypes = [
+            { type: 'racer', img: 'images/red_snail.png', name: 'Red' },
+            { type: 'explorer', img: 'images/blue_snail.png', name: 'Blue' },
+            { type: 'snake', img: 'images/green_snail.png', name: 'Green' },
+            { type: 'stubborn', img: 'images/purple_snail.png', name: 'Purple' },
+            { type: 'deadender', img: 'images/yellow_snail.png', name: 'Yellow' }
+        ];
+        
+        // Перемешиваем массив типов улиток
+        const shuffledTypes = this.shuffleArray([...snailTypes]);
+        
+        // Обновляем элементы DOM с новыми типами улиток
+        this.snailOptions.forEach((option, index) => {
+            const newSnailData = shuffledTypes[index];
+            
+            // Обновляем атрибуты и содержимое
+            option.dataset.snailType = newSnailData.type;
+            const imgElement = option.querySelector('img');
+            const nameElement = option.querySelector('span');
+            
+            // Обновляем изображение и имя
+            if (imgElement) imgElement.src = newSnailData.img;
+            if (nameElement) nameElement.textContent = newSnailData.name;
+            
+            // Сбрасываем выделение
+            option.classList.remove('selected');
+        });
+        
+        // Сбрасываем выбранный тип улитки
+        this.selectedSnailType = '';
+        
+        console.log("Типы улиток успешно перемешаны");
     }
 } 
