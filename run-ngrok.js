@@ -3,6 +3,10 @@
  * Создает защищенный туннель для доступа к локальному серверу из интернета
  */
 
+// При запуске на Railway этот файл не используется
+console.log('Ngrok в Railway не требуется. Используется прямой URL.');
+process.exit(0);
+
 const ngrok = require('ngrok');
 const fs = require('fs');
 const path = require('path');

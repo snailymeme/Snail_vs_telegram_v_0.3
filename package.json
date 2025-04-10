@@ -9,21 +9,19 @@
     "app": "node start.js --mode=app",
     "bot": "node start.js --mode=bot",
     "ngrok": "node start.js --mode=ngrok",
-    "dev": "node start.js --mode=full --clean"
+    "dev": "node start.js --mode=full --clean",
+    "railway": "node bot.js"
   },
   "dependencies": {
     "@solana/web3.js": "^1.43.0",
     "axios": "^1.6.7",
-    "chalk": "^4.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.63.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "http-server": "^14.1.1",
-    "ngrok": "^5.0.0-beta.2"
+    "http-server": "^14.1.1"
   },
   "engines": {
     "node": ">=14.0.0"
