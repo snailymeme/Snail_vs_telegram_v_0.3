@@ -269,9 +269,30 @@ class Game {
                 this.snailOptions.forEach(o => o.classList.remove('selected'));
                 // Выделяем выбранную улитку
                 option.classList.add('selected');
+                
                 // Сохраняем тип выбранной улитки
                 this.selectedSnailType = option.dataset.snailType;
-                console.log(`Выбрана улитка: ${this.selectedSnailType}`);
+                
+                // Сохраняем цвет выбранной улитки (используем originalColor или текущий цвет)
+                this.selectedSnailColor = option.dataset.originalColor || 
+                    option.dataset.snailColor || 
+                    option.querySelector('span').textContent;
+                
+                // Сохраняем путь к изображению, если доступен
+                const imgElement = option.querySelector('img');
+                if (imgElement) {
+                    this.selectedSnailImage = option.dataset.originalImage || imgElement.src;
+                }
+                
+                // Сохраняем данные о выбранной улитке для использования при создании гонки
+                this.selectedSnailData = {
+                    type: this.selectedSnailType,
+                    color: this.selectedSnailColor,
+                    image: this.selectedSnailImage,
+                    element: option
+                };
+                
+                console.log(`Выбрана улитка: тип=${this.selectedSnailType}, цвет=${this.selectedSnailColor}, изображение=${this.selectedSnailImage || 'не задано'}`);
             });
         });
         
@@ -569,40 +590,97 @@ class Game {
     startRace() {
         if (this.isRaceActive) return;
         
-        // Проверяем, выбрана ли улитка
+        console.log('Начинаем гонку...');
+        this.isRaceActive = true;
+        
+        // Скрываем экран выбора улитки
+        const selectionScreen = document.getElementById('snail-selection');
+        if (selectionScreen) selectionScreen.style.display = 'none';
+        
+        // Находим и обновляем выбранную улитку
         if (!this.selectedSnailType) {
-            alert('Пожалуйста, выберите улитку перед началом гонки');
-            return;
+            const selectedOption = document.querySelector('.snail-option.selected');
+            if (selectedOption) {
+                this.selectedSnailType = selectedOption.dataset.snailType;
+                this.selectedSnailColor = selectedOption.dataset.snailColor;
+                this.selectedSnailBehavior = selectedOption.dataset.snailBehavior;
+                console.log(`Выбрана улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor}`);
+            } else {
+                // Если ничего не выбрано, берем случайную улитку
+                console.log('Не выбрана улитка, выбираем случайную');
+                const randomIndex = Math.floor(Math.random() * this.snailOptions.length);
+                const randomOption = this.snailOptions[randomIndex];
+                this.selectedSnailType = randomOption.dataset.snailType;
+                this.selectedSnailColor = randomOption.dataset.snailColor;
+                this.selectedSnailBehavior = randomOption.dataset.snailBehavior;
+                console.log(`Выбрана случайная улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor}`);
+            }
         }
         
-        // Проверяем валидность ставки
-        if (this.bet <= 0 || this.bet > this.balance) {
-            alert('Пожалуйста, введите корректную ставку');
-            return;
+        // НОВОЕ: Сохраняем данные о выбранной улитке перед запуском гонки
+        if (this.selectedSnailType && this.selectedSnailColor) {
+            console.log(`Запоминаем данные о выбранной улитке: тип=${this.selectedSnailType}, цвет=${this.selectedSnailColor}`);
+            
+            // Сохраняем в глобальной области для доступа в других местах
+            window.PLAYER_SNAIL_COLOR = this.selectedSnailColor;
+            
+            // Обновляем карту цветов улиток
+            if (window.SNAIL_COLORS_MAP) {
+                window.SNAIL_COLORS_MAP.set(this.selectedSnailType, this.selectedSnailColor);
+            } else {
+                window.SNAIL_COLORS_MAP = new Map();
+                window.SNAIL_COLORS_MAP.set(this.selectedSnailType, this.selectedSnailColor);
+            }
+            
+            // Обновляем словарь соответствия типов улиток цветам
+            if (!window.SNAIL_TYPE_TO_COLOR) {
+                window.SNAIL_TYPE_TO_COLOR = {};
+            }
+            window.SNAIL_TYPE_TO_COLOR[this.selectedSnailType] = this.selectedSnailColor;
+            
+            // Добавляем в RANDOMIZED_SNAILS запись игрока, если ещё не добавлена
+            if (!window.RANDOMIZED_SNAILS) {
+                window.RANDOMIZED_SNAILS = [];
+            }
+            
+            const existingSnailIndex = window.RANDOMIZED_SNAILS.findIndex(s => s.type === this.selectedSnailType);
+            if (existingSnailIndex >= 0) {
+                // Обновляем существующую запись
+                window.RANDOMIZED_SNAILS[existingSnailIndex].color = this.selectedSnailColor;
+                window.RANDOMIZED_SNAILS[existingSnailIndex].originalColor = this.selectedSnailColor;
+                window.RANDOMIZED_SNAILS[existingSnailIndex].isPlayer = true;
+            } else {
+                // Добавляем новую запись
+                window.RANDOMIZED_SNAILS.push({
+                    type: this.selectedSnailType,
+                    color: this.selectedSnailColor,
+                    originalColor: this.selectedSnailColor,
+                    isPlayer: true
+                });
+            }
         }
         
         // Обновляем состояние игры
-        this.isRaceActive = true;
         this.raceStartTime = Date.now();
         this.elapsedTime = 0;
+        
+        // Скрываем экран выбора
+        this.hideAllScreens();
+        
+        // Показываем игровой экран
+        this.showGameScreen();
+        
+        // Устанавливаем статус гонки
+        this.raceStatusDisplay.textContent = "Подготовка к гонке...";
+        
+        // Воспроизводим звук начала гонки
+        this.playSound(ASSETS.SOUNDS.RACE_START);
         
         // Вычитаем ставку из баланса
         this.balance -= this.bet;
         this.updateBalanceDisplay();
         
-        // Обновляем отображение ставки
-        this.currentBetDisplay.textContent = this.bet;
-        
-        // Воспроизводим звук начала гонки
-        this.playSound(ASSETS.SOUNDS.RACE_START);
-        
-        // Отображаем экран игры
-        this.showGameScreen();
-        
-        // Сбрасываем масштаб к исходному состоянию
-        this.resetZoom();
-        
-        // Создаем новый лабиринт
+        // Создаем лабиринт и улиток
         const difficulty = this.difficulty || 'medium';
         console.log(`Создание лабиринта (сложность: ${difficulty})...`);
         
@@ -614,8 +692,34 @@ class Game {
         this.maze = new Maze(difficulty);
         console.log('Лабиринт создан:', this.maze);
         
+        // ОТЛАДКА: Выводим информацию о выбранной улитке
+        console.log("ОТЛАДКА ПЕРЕД СОЗДАНИЕМ УЛИТОК:");
+        console.log(`- Выбранный тип: ${this.selectedSnailType}`);
+        console.log(`- Выбранный цвет: ${this.selectedSnailColor}`);
+        console.log(`- Глобальный цвет: ${window.PLAYER_SNAIL_COLOR}`);
+        console.log(`- Данные рандомизации:`, window.RANDOMIZED_SNAILS);
+        
         // Создаем менеджер улиток
         this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
+        
+        // НОВОЕ: Если у нас есть информация о цвете, передаем ее в менеджер улиток
+        if (this.selectedSnailColor) {
+            console.log(`Передаем цвет улитки в менеджер: ${this.selectedSnailColor}`);
+            
+            // Проверяем наличие метода перед вызовом
+            if (typeof this.snailManager.setPlayerSnailColor === 'function') {
+                this.snailManager.setPlayerSnailColor(this.selectedSnailColor);
+            } else {
+                console.warn('Метод setPlayerSnailColor не найден в snailManager. Возможно, кэш браузера не обновлен.');
+                
+                // Альтернативное решение: устанавливаем цвет напрямую в улитку игрока
+                if (this.snailManager.playerSnail) {
+                    console.log('Устанавливаем цвет напрямую для улитки игрока');
+                    this.snailManager.playerSnail.originalColor = this.selectedSnailColor;
+                }
+            }
+        }
+        
         console.log('Менеджер улиток создан:', this.snailManager);
         
         // Отрисовываем лабиринт
@@ -824,6 +928,7 @@ class Game {
         console.log("Исходные данные улиток перед сортировкой:", finishedSnails.map(snail => ({
             type: snail.type,
             isPlayer: snail.isPlayer || snail.type === this.selectedSnailType,
+            color: snail.originalColor || '[не задан]',
             finishTime: snail.finishTime,
             relativeTime: snail.finishTime - this.raceStartTime,
             distanceToFinish: snail.distanceToFinish || 0
@@ -840,6 +945,7 @@ class Game {
         console.log("Отсортированные данные улиток:", sortedSnails.map(snail => ({
             type: snail.type,
             isPlayer: snail.isPlayer || snail.type === this.selectedSnailType,
+            color: snail.originalColor || '[не задан]',
             finishTime: snail.finishTime,
             relativeTime: snail.finishTime - this.raceStartTime,
             distanceToFinish: snail.distanceToFinish || 0
@@ -885,35 +991,61 @@ class Game {
             'deadender': 'Deadender'
         };
         
-        // Стандартное соответствие типов улиток с их цветами (если нет рандомизации)
-        const defaultSnailColors = {
-            'racer': 'Red',
-            'explorer': 'Blue',
-            'snake': 'Green',
-            'stubborn': 'Purple',
-            'deadender': 'Yellow'
-        };
-        
-        // Функция для получения данных рандомизированной улитки по её типу
-        const getSnailData = (snailType) => {
-            // Если есть рандомизация, ищем улитку по типу
-            if (this.randomizedSnails && this.randomizedSnails.length > 0) {
-                const snail = this.randomizedSnails.find(s => s.type === snailType);
-                if (snail) {
+        // Функция для получения корректных данных улитки
+        const getSnailData = (snail) => {
+            // Если у улитки есть оригинальный цвет, используем его
+            if (snail.originalColor) {
+                return {
+                    color: snail.originalColor,
+                    type: typeNames[snail.type] || snail.type,
+                    behavior: getSnailBehavior(snail.type)
+                };
+            }
+            
+            // Ищем в рандомизированных данных
+            if (window.RANDOMIZED_SNAILS) {
+                const snailData = window.RANDOMIZED_SNAILS.find(s => s.type === snail.type);
+                if (snailData) {
                     return {
-                        color: snail.color,
+                        color: snailData.originalColor || snailData.color,
                         type: typeNames[snail.type] || snail.type,
-                        behavior: snail.behavior
+                        behavior: snailData.behavior || getSnailBehavior(snail.type)
                     };
                 }
             }
             
-            // Если рандомизации нет или тип не найден, возвращаем стандартные данные
+            // Если не нашли, возвращаем стандартные данные
             return {
-                color: defaultSnailColors[snailType] || 'Unknown',
-                type: typeNames[snailType] || snailType,
-                behavior: typeNames[snailType] || snailType
+                color: snail.color || getDefaultColor(snail.type),
+                type: typeNames[snail.type] || snail.type,
+                behavior: getSnailBehavior(snail.type)
             };
+        };
+        
+        // Вспомогательная функция для получения поведения по типу
+        const getSnailBehavior = (snailType) => {
+            // Если у нас есть рандомизированные данные
+            if (window.RANDOMIZED_SNAILS) {
+                const snailData = window.RANDOMIZED_SNAILS.find(s => s.type === snailType);
+                if (snailData && snailData.behavior) {
+                    return snailData.behavior;
+                }
+            }
+            
+            // Стандартное поведение
+            return typeNames[snailType] || snailType;
+        };
+        
+        // Функция для получения стандартного цвета по типу улитки
+        const getDefaultColor = (snailType) => {
+            const defaultColors = {
+                'racer': 'Red',
+                'explorer': 'Blue',
+                'snake': 'Green',
+                'stubborn': 'Purple',
+                'deadender': 'Yellow'
+            };
+            return defaultColors[snailType] || 'Gray';
         };
         
         // Добавляем строки для каждой улитки
@@ -939,7 +1071,7 @@ class Game {
             row.appendChild(positionCell);
             
             // Получаем данные улитки
-            const snailData = getSnailData(snail.type);
+            const snailData = getSnailData(snail);
             console.log(`Данные улитки ${snail.type}:`, snailData);
             
             // Колонка 2: Цвет улитки
@@ -1498,9 +1630,9 @@ class Game {
      * Рандомизирует типы улиток, меняя их местами
      */
     randomizeSnailTypes() {
-        console.log("Рандомизация типов улиток...");
+        console.log("НАЧИНАЮ ПОЛНУЮ РАНДОМИЗАЦИЮ УЛИТОК");
         
-        // Определяем все цвета улиток
+        // Определяем доступные цвета улиток
         const snailColors = [
             { color: 'Red', img: 'images/red_snail.png' },
             { color: 'Blue', img: 'images/blue_snail.png' },
@@ -1527,68 +1659,89 @@ class Game {
             { behavior: 'Deadender' }
         ];
         
-        // Перемешиваем массивы
+        // ШАГ 1: Создаем перемешанные копии массивов для случайного назначения
         const shuffledColors = this.shuffleArray([...snailColors]);
         const shuffledTypes = this.shuffleArray([...snailTypes]);
         const shuffledBehaviors = this.shuffleArray([...snailBehaviors]);
         
-        // Создаем объект для сохранения рандомизированных соответствий
-        // Для отображения в таблице результатов
-        this.randomizedSnails = [];
+        console.log("Перемешанные цвета:", shuffledColors.map(c => c.color));
+        console.log("Перемешанные типы:", shuffledTypes.map(t => t.type));
+        console.log("Перемешанные поведения:", shuffledBehaviors.map(b => b.behavior));
         
-        // Сохраняем оригинальные характеристики для восстановления при необходимости
-        if (!this.originalSnailCharacteristics) {
-            this.originalSnailCharacteristics = {};
-            
-            for (const key in ASSETS.SNAIL_TYPES) {
-                this.originalSnailCharacteristics[key] = { ...ASSETS.SNAIL_TYPES[key] };
-            }
-        }
+        // ШАГ 2: Создаем массив для хранения рандомизированных улиток
+        const randomizedSnails = [];
         
-        // Обновляем DOM-элементы и создаем полные объекты улиток с тремя уровнями рандомизации
+        // Создаем Map для быстрого доступа к цветам по типу улитки
+        window.SNAIL_COLORS_MAP = new Map();
+        
+        // ШАГ 3: Назначаем цвета и поведение DOM-элементам и создаем объекты с данными улиток
         this.snailOptions.forEach((option, index) => {
-            // Сохраняем оригинальный тип, если еще не сохранен
-            const originalType = option.dataset.originalType || option.dataset.snailType;
-            option.dataset.originalType = originalType;
-            
-            // Получаем рандомизированные данные
+            // Получаем рандомизированные данные из перемешанных массивов
             const colorData = shuffledColors[index];
             const typeData = shuffledTypes[index];
             const behaviorData = shuffledBehaviors[index];
             
-            // Обновляем атрибуты элемента
+            // ВАЖНО: Привязываем фиксированный цвет к DOM-элементу
+            const colorName = colorData.color;
+            
+            // Сохраняем исходные данные для восстановления при необходимости
+            option.dataset.originalType = typeData.type;
+            option.dataset.originalColor = colorName;
+            option.dataset.originalImage = colorData.img;
+            option.dataset.originalBehavior = behaviorData.behavior;
+            
+            // ВАЖНО: Устанавливаем текущие атрибуты элемента
             option.dataset.snailType = typeData.type;
-            option.dataset.snailColor = colorData.color;
+            option.dataset.snailColor = colorName;
             option.dataset.snailBehavior = behaviorData.behavior;
             
-            // Обновляем изображение и название
-            const imgElement = option.querySelector('img');
-            const nameElement = option.querySelector('span');
+            // Обновляем визуальное представление если нужно
+            // const nameElement = option.querySelector('span');
+            // if (nameElement) nameElement.textContent = colorName;
             
-            if (imgElement) imgElement.src = colorData.img;
-            if (nameElement) nameElement.textContent = colorData.color;
+            // const imgElement = option.querySelector('img');
+            // if (imgElement) imgElement.src = colorData.img;
             
             // Сбрасываем выделение
             option.classList.remove('selected');
             
-            // Добавляем информацию о текущей улитке в массив рандомизированных улиток
-            this.randomizedSnails.push({
-                color: colorData.color,
+            // Создаем объект с данными об улитке
+            const snailData = {
                 type: typeData.type,
+                color: colorName,
+                originalColor: colorName, // ВАЖНО: Сохраняем оригинальный цвет
                 behavior: behaviorData.behavior,
+                image: colorData.img,
                 index: index
-            });
+            };
+            
+            // Добавляем в массив рандомизированных улиток
+            randomizedSnails.push(snailData);
+            
+            // Добавляем в Map для быстрого доступа
+            window.SNAIL_COLORS_MAP.set(typeData.type, colorName);
+            
+            console.log(`Улитка #${index}: тип=${typeData.type}, цвет=${colorName}, поведение=${behaviorData.behavior}`);
         });
         
-        console.log("Рандомизированные улитки:", this.randomizedSnails);
+        console.log("Итоговый список рандомизированных улиток:", randomizedSnails);
+        console.log("Карта соответствия типов и цветов:", [...window.SNAIL_COLORS_MAP.entries()]);
         
-        // Делаем объект доступным глобально для отладки
-        window.RANDOMIZED_SNAILS = this.randomizedSnails;
+        // ШАГ 4: Сохраняем данные для использования в других частях приложения
         
-        // Сбрасываем выбранный тип улитки
-        this.selectedSnailType = '';
+        // Важно! Делаем глубокую копию для избежания проблем с изменением исходных данных
+        this.randomizedSnails = JSON.parse(JSON.stringify(randomizedSnails));
         
-        console.log("Типы улиток успешно перемешаны");
+        // Делаем данные доступными глобально
+        window.RANDOMIZED_SNAILS = JSON.parse(JSON.stringify(randomizedSnails));
+        
+        // Создаем дополнительную структуру для быстрого поиска по типу
+        window.SNAIL_TYPE_TO_COLOR = {};
+        randomizedSnails.forEach(snail => {
+            window.SNAIL_TYPE_TO_COLOR[snail.type] = snail.originalColor;
+        });
+        
+        console.log("Инициализирована глобальная карта цветов:", window.SNAIL_TYPE_TO_COLOR);
     }
     
     /**

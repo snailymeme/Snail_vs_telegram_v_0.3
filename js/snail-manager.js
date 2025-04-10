@@ -37,7 +37,40 @@ class SnailManager {
         // Создаем улитку игрока
         this.playerSnail = new Snail(playerSnailType, startRow, startCol, this.maze);
         this.playerSnail.isPlayer = true;
+        
+        // НОВОЕ: ищем цвет улитки игрока из нескольких источников
+        let playerSnailColor = null;
+        
+        // 1. Проверяем глобальную переменную PLAYER_SNAIL_COLOR
+        if (window.PLAYER_SNAIL_COLOR) {
+            playerSnailColor = window.PLAYER_SNAIL_COLOR;
+            console.log(`Использую цвет улитки из глобальной переменной: ${playerSnailColor}`);
+        } 
+        // 2. Проверяем данные рандомизации
+        else if (window.RANDOMIZED_SNAILS) {
+            const playerSnailData = window.RANDOMIZED_SNAILS.find(s => s.type === playerSnailType);
+            if (playerSnailData) {
+                playerSnailColor = playerSnailData.originalColor || playerSnailData.color;
+                console.log(`Найден цвет улитки в RANDOMIZED_SNAILS: ${playerSnailColor}`);
+            }
+        }
+        
+        // Если нашли цвет, устанавливаем его для улитки игрока
+        if (playerSnailColor) {
+            console.log(`Устанавливаю цвет ${playerSnailColor} для улитки игрока типа ${playerSnailType}`);
+            this.playerSnail.originalColor = playerSnailColor;
+        } else {
+            console.warn(`Не удалось найти цвет для улитки игрока типа ${playerSnailType}`);
+        }
+        
         this.snails.push(this.playerSnail);
+        
+        // НОВОЕ: Отслеживаем использованные цвета, чтобы не было дубликатов
+        const usedColors = new Set();
+        // Добавляем цвет игрока в использованные
+        if (playerSnailColor) {
+            usedColors.add(playerSnailColor.toLowerCase());
+        }
         
         // Создаем компьютерных улиток
         const snailTypes = Object.keys(ASSETS.SNAIL_TYPES)
@@ -48,12 +81,62 @@ class SnailManager {
         const computerSnailCount = NUM_COMPUTER_SNAILS;
         const shuffledTypes = this.shuffleArray([...snailTypes]);
         
+        // НОВОЕ: Определяем все доступные цвета
+        const availableColors = ['Red', 'Blue', 'Green', 'Purple', 'Yellow'].filter(
+            color => !usedColors.has(color.toLowerCase())
+        );
+        console.log(`Доступные цвета для компьютерных улиток: ${availableColors.join(', ')}`);
+        
+        // Перемешиваем доступные цвета для случайного назначения
+        const shuffledColors = this.shuffleArray([...availableColors]);
+        
         for (let i = 0; i < computerSnailCount && i < shuffledTypes.length; i++) {
-            const snail = new Snail(shuffledTypes[i], startRow, startCol, this.maze);
+            const snailType = shuffledTypes[i];
+            const snail = new Snail(snailType, startRow, startCol, this.maze);
+            
+            // НОВОЕ: Присваиваем уникальный цвет каждой компьютерной улитке
+            if (i < shuffledColors.length) {
+                const uniqueColor = shuffledColors[i];
+                snail.originalColor = uniqueColor;
+                usedColors.add(uniqueColor.toLowerCase());
+                console.log(`Установлен уникальный цвет ${uniqueColor} для компьютерной улитки типа ${snailType}`);
+            } else {
+                // Если не хватает уникальных цветов, генерируем случайный цвет
+                const randomColor = this.generateRandomColor(usedColors);
+                snail.originalColor = randomColor;
+                usedColors.add(randomColor.toLowerCase());
+                console.log(`Установлен случайный цвет ${randomColor} для компьютерной улитки типа ${snailType}`);
+            }
+            
             this.snails.push(snail);
         }
         
-        console.log(`Создано ${this.snails.length} улиток для гонки`);
+        console.log(`Создано ${this.snails.length} улиток для гонки с уникальными цветами`);
+    }
+    
+    /**
+     * Генерация случайного цвета, которого нет в множестве использованных
+     * @param {Set} usedColors - Множество уже использованных цветов (в нижнем регистре)
+     * @returns {string} Уникальный цвет
+     */
+    generateRandomColor(usedColors) {
+        // Базовый набор цветов
+        const baseColors = ['Red', 'Blue', 'Green', 'Purple', 'Yellow', 'Orange', 'Pink', 'Cyan', 'Magenta'];
+        
+        // Пытаемся найти неиспользованный цвет
+        for (const color of baseColors) {
+            if (!usedColors.has(color.toLowerCase())) {
+                return color;
+            }
+        }
+        
+        // Если все цвета использованы, генерируем случайный со счетчиком
+        const baseColor = baseColors[Math.floor(Math.random() * baseColors.length)];
+        let index = 1;
+        while (usedColors.has(`${baseColor.toLowerCase()}${index}`)) {
+            index++;
+        }
+        return `${baseColor}${index}`;
     }
     
     /**
@@ -623,5 +706,31 @@ class SnailManager {
      */
     getFinishedSnails() {
         return this.finishedSnails;
+    }
+    
+    /**
+     * Устанавливает цвет для улитки игрока
+     * @param {string} color - Цвет улитки игрока
+     */
+    setPlayerSnailColor(color) {
+        console.log(`Устанавливаю цвет улитки игрока: ${color}`);
+        
+        if (this.playerSnail) {
+            this.playerSnail.originalColor = color;
+            
+            // При необходимости обновляем внешний вид улитки
+            if (this.playerSnail.element) {
+                const snailImage = this.playerSnail.element.querySelector('img');
+                if (snailImage) {
+                    const colorLower = color.toLowerCase();
+                    snailImage.src = `images/${colorLower}_snail.png`;
+                    console.log(`Изображение улитки игрока обновлено на: ${colorLower}`);
+                }
+            }
+        } else {
+            console.warn('Улитка игрока не создана, цвет будет установлен при её создании');
+            // Сохраняем цвет для последующего использования
+            this.pendingPlayerColor = color;
+        }
     }
 } 

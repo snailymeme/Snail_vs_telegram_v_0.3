@@ -19,6 +19,10 @@ class Snail {
         this.speedVariation = snailConfig.SPEED_VARIATION;
         this.color = snailConfig.COLOR;
         
+        // Новое: изначальный цвет улитки (будет установлен позже для улитки игрока)
+        this.originalColor = null;
+        this.isPlayer = false; // Флаг, указывающий, является ли улитка игроком
+        
         // Общие настройки для всех улиток
         this.cellSize = ASSETS.CELL_SIZE;
         this.isMoving = false;
@@ -114,6 +118,10 @@ class Snail {
         this.element.style.willChange = 'transform'; // Оптимизация производительности
         this.element.style.zIndex = '10';
         
+        // НОВОЕ: Определяем и сохраняем фактический цвет улитки
+        const actualColor = this.determineActualColor();
+        this.displayColor = actualColor;
+        
         // Добавляем след улитки для визуального эффекта
         this.trailElement = document.createElement('div');
         this.trailElement.className = `snail-trail snail-trail-${this.type}`;
@@ -122,14 +130,24 @@ class Snail {
         this.trailElement.style.height = `${elementSize/5}px`;
         this.trailElement.style.borderRadius = '50%';
         this.trailElement.style.opacity = '0.4';
-        this.trailElement.style.backgroundColor = this.color;
+        this.trailElement.style.backgroundColor = actualColor.toLowerCase(); // Используем определенный цвет
         this.trailElement.style.zIndex = '5';
         this.trailElement.style.pointerEvents = 'none';
         container.appendChild(this.trailElement);
         
         // Создаем изображение улитки
         const snailImage = document.createElement('img');
-        snailImage.src = ASSETS.IMAGES.SNAILS[this.type.toUpperCase()];
+        
+        // Создаем путь к изображению улитки на основе определенного цвета
+        const colorLower = actualColor.toLowerCase();
+        snailImage.src = `images/${colorLower}_snail.png`;
+        console.log(`[RENDER] Улитка типа "${this.type}" (${this.isPlayer ? 'ИГРОК' : 'компьютер'}) отображается как ${actualColor}`);
+        
+        // Добавляем атрибут данных для отладки
+        this.element.dataset.originalColor = actualColor;
+        this.element.dataset.snailType = this.type;
+        this.element.dataset.isPlayer = this.isPlayer;
+        
         snailImage.alt = this.name;
         snailImage.style.width = '100%';
         snailImage.style.height = '100%';
@@ -158,6 +176,49 @@ class Snail {
         
         // Запускаем анимационный цикл для улитки
         this.animationFrameId = requestAnimationFrame(this.animationFrame.bind(this));
+    }
+    
+    /**
+     * Определяет фактический цвет улитки на основе глобальных настроек и типа улитки
+     * @returns {string} Цвет улитки для отображения
+     */
+    determineActualColor() {
+        console.log(`[determineActualColor] Начинаю определение цвета улитки типа ${this.type}, isPlayer=${this.isPlayer}`);
+        
+        // Если есть явно заданный цвет, используем его
+        if (this.originalColor) {
+            console.log(`[determineActualColor] Найден originalColor: ${this.originalColor}`);
+            return this.originalColor;
+        }
+
+        // Если это улитка игрока, проверяем глобальные настройки
+        if (this.isPlayer && window.PLAYER_SNAIL_COLOR) {
+            console.log(`[determineActualColor] Это улитка игрока, использую PLAYER_SNAIL_COLOR: ${window.PLAYER_SNAIL_COLOR}`);
+            return window.PLAYER_SNAIL_COLOR;
+        }
+        
+        // Иначе используем цвет на основе типа улитки
+        const defaultColor = this.getDefaultColor();
+        console.log(`[determineActualColor] Использую цвет по умолчанию для типа ${this.type}: ${defaultColor}`);
+        return defaultColor;
+    }
+    
+    /**
+     * Возвращает цвет по умолчанию на основе типа улитки
+     * @returns {string} Цвет по умолчанию
+     */
+    getDefaultColor() {
+        // Строгое соответствие между типами улиток и цветами
+        const defaultColors = {
+            'racer': 'Red',
+            'explorer': 'Blue',
+            'snake': 'Green',
+            'stubborn': 'Purple',
+            'deadender': 'Yellow'
+        };
+        
+        // Возвращаем цвет по типу или синий по умолчанию
+        return defaultColors[this.type] || 'Blue';
     }
     
     /**
@@ -1049,36 +1110,47 @@ class Snail {
             ctx.scale(scaleX, 1);
         }
         
-        // Определяем, какое изображение улитки использовать на основе типа
+        // Определяем путь к изображению улитки на основе типа и цвета
         let imagePath;
-        switch (this.type) {
-            case 'racer':
-                imagePath = 'images/red_snail.png';
-                break;
-            case 'explorer':
-                imagePath = 'images/blue_snail.png';
-                break;
-            case 'snake':
-                imagePath = 'images/green_snail.png';
-                break;
-            case 'stubborn':
-                imagePath = 'images/purple_snail.png';
-                break;
-            case 'deadender':
-                imagePath = 'images/yellow_snail.png';
-                break;
-            default:
-                imagePath = 'images/blue_snail.png';
-        }
+        
+        // Определяем цвет для использования в пути к файлу
+        const snailColor = this.determineActualColor().toLowerCase();
+        
+        // Формируем путь к изображению на основе определенного цвета
+        imagePath = `images/${snailColor}_snail.png`;
+        console.log(`Отрисовка улитки типа ${this.type} с цветом: ${snailColor}`);
         
         // Получаем изображение из кэша ASSETS или создаем новое
         let snailImage;
-        if (ASSETS.snailImages[this.type]) {
-            snailImage = ASSETS.snailImages[this.type];
+        
+        // Формируем уникальный ключ, гарантирующий отсутствие коллизий
+        const cacheKey = `snail_${this.type}_${snailColor}`;
+        
+        // Проверяем, есть ли изображение в кэше
+        if (ASSETS.snailImages && ASSETS.snailImages[cacheKey]) {
+            snailImage = ASSETS.snailImages[cacheKey];
         } else {
+            // Создаем новое изображение и сохраняем в кэше
             snailImage = new Image();
+            
+            // Добавляем обработчики событий для диагностики
+            snailImage.onload = () => {
+                console.log(`Изображение улитки ${cacheKey} успешно загружено`);
+            };
+            
+            snailImage.onerror = (error) => {
+                console.error(`Ошибка загрузки изображения улитки ${cacheKey}:`, error);
+                console.error(`Путь к изображению: ${imagePath}`);
+            };
+            
             snailImage.src = imagePath;
-            ASSETS.snailImages[this.type] = snailImage;
+            
+            // Инициализируем объект для кэширования, если он еще не существует
+            if (!ASSETS.snailImages) {
+                ASSETS.snailImages = {};
+            }
+            
+            ASSETS.snailImages[cacheKey] = snailImage;
         }
         
         // Добавляем тень для эффекта глубины
@@ -1088,17 +1160,23 @@ class Snail {
         ctx.shadowOffsetY = 2;
         
         // Проверяем, загружено ли изображение
-        if (snailImage && snailImage.complete) {
+        if (snailImage && snailImage.complete && snailImage.naturalWidth > 0) {
             // Отрисовываем изображение улитки
-            ctx.drawImage(
-                snailImage,
-                -snailSize / 2,
-                -snailSize / 2,
-                snailSize,
-                snailSize
-            );
+            try {
+                ctx.drawImage(
+                    snailImage,
+                    -snailSize / 2,
+                    -snailSize / 2,
+                    snailSize,
+                    snailSize
+                );
+            } catch (error) {
+                console.error(`Ошибка при отрисовке изображения улитки ${cacheKey}:`, error);
+                this.drawFallbackSnail(ctx, snailSize);
+            }
         } else {
-            // Запасной вариант, если изображение не загружено
+            // Запасной вариант, если изображение не загружено или повреждено
+            console.warn(`Использую запасной вариант отрисовки для улитки ${cacheKey}`);
             this.drawFallbackSnail(ctx, snailSize);
         }
         
@@ -1282,13 +1360,29 @@ class SnailManager {
             this.maze.start.col,
             this.maze
         );
-        this.playerSnail.isPlayer = true; // Отмечаем, что это улитка игрока
+        
+        // Устанавливаем флаг игрока и сохраняем цвет улитки игрока
+        this.playerSnail.isPlayer = true;
+        
+        // Определяем цвет улитки игрока - либо из настроек, либо по типу
+        const playerColor = window.PLAYER_SNAIL_COLOR || this.playerSnail.getDefaultColor();
+        this.playerSnail.originalColor = playerColor;
+        
         this.snails.push(this.playerSnail);
         
-        // Создаем компьютерных соперников
+        // Создаем компьютерных соперников с уникальными цветами
         const remainingTypes = snailTypes.filter(type => type !== playerSnailType);
         const computerSnailsCount = Math.min(remainingTypes.length, ASSETS.GAME.SNAIL_COUNT - 1);
         
+        // Полный набор доступных цветов
+        const allColors = ['Red', 'Blue', 'Green', 'Purple', 'Yellow', 'Orange', 'Pink'];
+        
+        // Удаляем цвет игрока из доступных, чтобы избежать дублирования
+        const availableColors = allColors.filter(color => 
+            color.toLowerCase() !== playerColor.toLowerCase()
+        );
+        
+        // Создаем компьютерных улиток с гарантированно уникальными цветами
         for (let i = 0; i < computerSnailsCount; i++) {
             const snail = new Snail(
                 remainingTypes[i],
@@ -1296,10 +1390,22 @@ class SnailManager {
                 this.maze.start.col,
                 this.maze
             );
+            
+            // Явно задаем цвет для каждой улитки из уникального набора
+            // Используем модуль, чтобы не выйти за границы массива
+            snail.originalColor = availableColors[i % availableColors.length];
+            
             this.snails.push(snail);
         }
         
-        console.log(`Создано ${this.snails.length} улиток. Тип улитки игрока: ${playerSnailType}`);
+        // Проверяем и логируем, что все улитки имеют разные цвета
+        const snailColors = this.snails.map(snail => {
+            const color = snail.originalColor;
+            console.log(`Создана улитка: тип=${snail.type}, цвет=${color}, isPlayer=${snail.isPlayer}`);
+            return color;
+        });
+        
+        console.log(`Создано ${this.snails.length} улиток с цветами: ${snailColors.join(', ')}`);
         return this;
     }
     

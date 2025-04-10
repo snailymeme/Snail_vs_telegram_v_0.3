@@ -27,7 +27,8 @@ class MazeGenerator {
         this.boostsCount = Math.round(mazeConfig.BOOSTS * Math.sqrt(scaleFactor)) || 3;
         
         console.log(`Создание лабиринта размером ${this.rows}x${this.cols} (сложность: ${difficulty})`);
-        console.log(`Специальные элементы: ${this.randomPathsCount} доп. путей, ${this.trapsCount} ловушек, ${this.boostsCount} ускорителей`);
+        console.log(`Специальные элементы: ${this.randomPathsCount} доп. путей, ${this.trapsCount} ловушек (бомб), ${this.boostsCount} ускорителей (ракет)`);
+        console.log(`Согласно конфигурации сложности: random_paths=${mazeConfig.RANDOM_PATHS}, traps=${mazeConfig.TRAPS}, boosts=${mazeConfig.BOOSTS}`);
         
         this.cellTypes = ASSETS.CELL_TYPES;
     }
@@ -208,6 +209,10 @@ class MazeGenerator {
     addSpecialCells(maze, cellType, count) {
         let added = 0;
         let attempts = 0;
+        const cellTypeName = cellType === ASSETS.CELL_TYPES.TRAP ? "бомбы" : 
+                           cellType === ASSETS.CELL_TYPES.BOOST ? "ракеты" : "спецячейки";
+        
+        console.log(`Начинаем добавление ${count} ${cellTypeName} в лабиринт...`);
         
         while (added < count && attempts < 100) {
             // Выбираем случайную позицию внутри лабиринта
@@ -222,6 +227,8 @@ class MazeGenerator {
             
             attempts++;
         }
+        
+        console.log(`Добавлено ${added} ${cellTypeName} за ${attempts} попыток`);
     }
     
     /**

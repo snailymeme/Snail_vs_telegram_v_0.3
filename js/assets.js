@@ -46,29 +46,29 @@ const GAME_ASSETS = {
             ROWS: 16,
             COLS: 16,
             RANDOM_PATHS: 2,
-            TRAPS: 3,
-            BOOSTS: 3
+            TRAPS: 6,
+            BOOSTS: 6
         },
         MEDIUM: {
             ROWS: 21,
             COLS: 21, 
             RANDOM_PATHS: 4,
-            TRAPS: 6,
-            BOOSTS: 5
+            TRAPS: 12,
+            BOOSTS: 10
         },
         HARD: {
             ROWS: 26,
             COLS: 26,
             RANDOM_PATHS: 6,
-            TRAPS: 9,
-            BOOSTS: 6
+            TRAPS: 18,
+            BOOSTS: 12
         },
         EXTREME: {
             ROWS: 31,
             COLS: 31,
             RANDOM_PATHS: 8,
-            TRAPS: 12,
-            BOOSTS: 8
+            TRAPS: 24,
+            BOOSTS: 16
         }
     },
     
