@@ -12,10 +12,11 @@ const GAME_ASSETS = {
             DEADENDER: 'images/yellow_snail.png'
         },
         MAZE: {
-            WALL: 'images/wall_texture.png',
-            PATH: 'images/path_texture.png',
-            START: 'images/start.png',
-            FINISH: 'images/finish.png',
+            // Комментируем несуществующие текстуры, так как они не используются
+            // WALL: 'images/wall_texture.png',
+            // PATH: 'images/path_texture.png',
+            // START: 'images/start.png',
+            // FINISH: 'images/finish.png',
         }
     },
     
@@ -190,10 +191,6 @@ const GAME_ASSETS = {
         'images/green_snail.png',
         'images/purple_snail.png',
         'images/yellow_snail.png',
-        'images/wall_texture.png',
-        'images/path_texture.png',
-        'images/start.png',
-        'images/finish.png',
         'mp3/click.mp3',
         'mp3/bomb.mp3',
         'mp3/rocket.mp3',
@@ -209,11 +206,7 @@ const GAME_ASSETS = {
     init: function(callback) {
         // Загружаем общие изображения
         this.loadImages({
-            'background': 'images/background.png',
-            'maze_tile': 'images/path_texture.png',
-            'wall': 'images/wall_texture.png',
-            'start': 'images/start.png',
-            'finish': 'images/finish.png'
+            'background': 'images/background.png'
         });
         
         // Загружаем изображения улиток для разных типов

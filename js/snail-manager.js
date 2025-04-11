@@ -202,11 +202,19 @@ class SnailManager {
         
         this.raceId = raceId;
         this.raceInProgress = true;
+        this.isRaceStarted = true;
         this.raceStartTime = Date.now();
         this.finishedCount = 0;
         
         // Перемешиваем массив улиток для случайного порядка старта
         this.shuffleArray(this.snails);
+        
+        // Запускаем движение каждой улитки
+        this.snails.forEach(snail => {
+            snail.reset(); // Сбрасываем улитку в начальное положение
+            snail.start(); // Запускаем движение улитки
+            console.log(`Запущено движение улитки ${snail.type}`);
+        });
     }
     
     /**
@@ -513,8 +521,9 @@ class SnailManager {
         
         console.log(`Улитка ${snail.type} финишировала на позиции ${snail.finishPosition}`);
         
-        // Если все улитки финишировали или улитка игрока финишировала, отправляем событие о завершении гонки
-        if (this.finishedCount === this.snails.length || snail.isPlayer) {
+        // Отправляем событие о завершении гонки ТОЛЬКО если все улитки финишировали
+        // Убираем проверку на финиш улитки игрока - гонка должна продолжаться до финиша всех улиток
+        if (this.finishedCount === this.snails.length) {
             this.sendRaceFinishedEvent();
         }
     }
@@ -545,6 +554,7 @@ class SnailManager {
         
         console.log("Принудительное завершение гонки");
         this.raceInProgress = false;
+        this.isRaceStarted = false;
         
         // Останавливаем фоновую музыку
         this.stopBackgroundMusic();

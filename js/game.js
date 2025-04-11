@@ -412,57 +412,83 @@ class Game {
     preloadAudioFiles() {
         console.log("Предварительная загрузка аудиофайлов");
         
-        // Проверяем доступность файла
-        const checkFileExists = async (url) => {
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                return response.ok;
-            } catch (e) {
-                console.error(`Ошибка проверки файла ${url}:`, e);
-                return false;
-            }
+        // Создаем функцию для инициализации аудио после взаимодействия с пользователем
+        const initializeAudio = () => {
+            // Проверяем доступность файла
+            const checkFileExists = async (url) => {
+                try {
+                    const response = await fetch(url, { method: 'HEAD' });
+                    return response.ok;
+                } catch (e) {
+                    console.error(`Ошибка проверки файла ${url}:`, e);
+                    return false;
+                }
+            };
+            
+            // Список всех звуковых файлов для предзагрузки
+            const audioFiles = [
+                ASSETS.SOUNDS.CLICK,
+                ASSETS.SOUNDS.BOMB,
+                ASSETS.SOUNDS.ROCKET,
+                ASSETS.SOUNDS.FINISH,
+                ASSETS.SOUNDS.RACE_START,
+                ASSETS.SOUNDS.RACE_MUSIC
+            ];
+            
+            // Для каждого файла создаем Audio элемент и загружаем его
+            audioFiles.forEach(async (file) => {
+                if (!file) return;
+                
+                try {
+                    const audioUrl = file; // Используем простой путь без URL конструктора
+                    console.log(`Предзагрузка аудио: ${audioUrl}`);
+                    
+                    const audio = new Audio();
+                    audio.addEventListener('canplaythrough', () => {
+                        console.log(`Аудиофайл загружен: ${file}`);
+                    });
+                    
+                    audio.addEventListener('error', (e) => {
+                        console.error(`Ошибка загрузки аудио ${file}:`, e);
+                    });
+                    
+                    audio.preload = 'auto';
+                    audio.src = audioUrl;
+                    
+                    // Сохраняем ссылку на аудио объект для предотвращения сборки мусора
+                    if (!this.preloadedAudio) this.preloadedAudio = [];
+                    this.preloadedAudio.push(audio);
+                } catch (e) {
+                    console.error(`Ошибка при подготовке аудио ${file}:`, e);
+                }
+            });
+            
+            // Удаляем обработчик после инициализации
+            document.removeEventListener('click', initializeAudioContext);
         };
         
-        // Список всех звуковых файлов для предзагрузки
-        const audioFiles = [
-            ASSETS.SOUNDS.CLICK,
-            ASSETS.SOUNDS.BOMB,
-            ASSETS.SOUNDS.ROCKET,
-            ASSETS.SOUNDS.FINISH,
-            ASSETS.SOUNDS.RACE_START,
-            ASSETS.SOUNDS.RACE_MUSIC
-        ];
-        
-        // Для каждого файла создаем Audio элемент и загружаем его
-        audioFiles.forEach(async (file) => {
-            if (!file) return;
-            
-            const audioUrl = new URL(file, window.location.href).href;
-            console.log(`Предзагрузка аудио: ${audioUrl}`);
-            
-            // Проверяем существование файла
-            const exists = await checkFileExists(audioUrl);
-            if (!exists) {
-                console.error(`Аудиофайл не найден: ${audioUrl}`);
-                return;
+        // Инициализируем AudioContext после взаимодействия с пользователем
+        const initializeAudioContext = () => {
+            console.log("Разблокировка аудио контекста по взаимодействию с пользователем");
+            // Создаем и разблокируем AudioContext
+            if (!window.audioContext) {
+                try {
+                    window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    if (window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    }
+                } catch (e) {
+                    console.error("Не удалось создать AudioContext:", e);
+                    return;
+                }
             }
             
-            const audio = new Audio();
-            audio.addEventListener('canplaythrough', () => {
-                console.log(`Аудиофайл загружен: ${file}`);
-            });
-            
-            audio.addEventListener('error', (e) => {
-                console.error(`Ошибка загрузки аудио ${file}:`, e);
-            });
-            
-            audio.preload = 'auto';
-            audio.src = audioUrl;
-            
-            // Сохраняем ссылку на аудио объект для предотвращения сборки мусора
-            if (!this.preloadedAudio) this.preloadedAudio = [];
-            this.preloadedAudio.push(audio);
-        });
+            // Теперь, когда контекст разблокирован, инициализируем аудио
+            initializeAudio();
+        };
+        
+        // Добавляем обработчик для инициализации аудио после клика пользователя
+        document.addEventListener('click', initializeAudioContext, { once: true });
     }
     
     /**
@@ -1818,8 +1844,9 @@ class Game {
             time: s.finishTime - this.raceStartTime
         })));
         
-        // Воспроизводим звук завершения гонки
-        this.playSound(ASSETS.SOUNDS.FINISH);
+        // Звук финиша теперь воспроизводится для каждой улитки отдельно в методе checkFinish
+        // Звук для окончания всей гонки может быть другим, но пока закомментируем
+        // this.playSound(ASSETS.SOUNDS.FINISH);
         
         // Обновляем баланс в зависимости от результата
         if (playerPosition === 1) {

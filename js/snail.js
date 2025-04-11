@@ -997,6 +997,18 @@ class Snail {
             this.row === this.maze.finish.row && 
             this.col === this.maze.finish.col) {
             console.log(`Улитка ${this.type} достигла финиша!`);
+            
+            // Воспроизводим звук финиша
+            try {
+                if (ASSETS && ASSETS.SOUNDS && ASSETS.SOUNDS.FINISH) {
+                    const audio = new Audio(ASSETS.SOUNDS.FINISH);
+                    audio.volume = 0.5;
+                    audio.play().catch(e => console.error("Ошибка при воспроизведении звука финиша:", e));
+                }
+            } catch (e) {
+                console.error("Ошибка при попытке воспроизвести звук финиша:", e);
+            }
+            
             // Отправляем событие о финише улитки
             this.hasFinished = true;
             const event = new CustomEvent('snailFinished', { detail: this });
@@ -1330,219 +1342,5 @@ class Snail {
         interval = Math.min(interval, 2000); // Не медленнее 2000мс
         
         return interval;
-    }
-}
-
-/**
- * Класс для управления всеми улитками
- */
-class SnailManager {
-    constructor(playerSnailType, maze) {
-        this.maze = maze;
-        this.snails = [];
-        this.finishedSnails = [];
-        this.playerSnail = null;
-        this.isRaceActive = false;
-        
-        // Создаем улиток сразу при инициализации
-        this.createSnails(playerSnailType);
-    }
-    
-    /**
-     * Создание улиток для гонки
-     */
-    createSnails(playerSnailType) {
-        this.snails = [];
-        this.finishedSnails = [];
-        
-        // Получаем все типы улиток
-        const snailTypes = Object.keys(ASSETS.SNAIL_TYPES).map(key => 
-            ASSETS.SNAIL_TYPES[key].TYPE.toLowerCase()
-        );
-        
-        // Создаем улитку игрока
-        this.playerSnail = new Snail(
-            playerSnailType,
-            this.maze.start.row,
-            this.maze.start.col,
-            this.maze
-        );
-        
-        // Устанавливаем флаг игрока и сохраняем цвет улитки игрока
-        this.playerSnail.isPlayer = true;
-        
-        // Определяем цвет улитки игрока - либо из настроек, либо по типу
-        const playerColor = window.PLAYER_SNAIL_COLOR || this.playerSnail.getDefaultColor();
-        this.playerSnail.originalColor = playerColor;
-        
-        this.snails.push(this.playerSnail);
-        
-        // Создаем компьютерных соперников с уникальными цветами
-        const remainingTypes = snailTypes.filter(type => type !== playerSnailType);
-        const computerSnailsCount = Math.min(remainingTypes.length, ASSETS.GAME.SNAIL_COUNT - 1);
-        
-        // Полный набор доступных цветов
-        const allColors = ['Red', 'Blue', 'Green', 'Purple', 'Yellow', 'Orange', 'Pink'];
-        
-        // Удаляем цвет игрока из доступных, чтобы избежать дублирования
-        const availableColors = allColors.filter(color => 
-            color.toLowerCase() !== playerColor.toLowerCase()
-        );
-        
-        // Создаем компьютерных улиток с гарантированно уникальными цветами
-        for (let i = 0; i < computerSnailsCount; i++) {
-            const snail = new Snail(
-                remainingTypes[i],
-                this.maze.start.row,
-                this.maze.start.col,
-                this.maze
-            );
-            
-            // Явно задаем цвет для каждой улитки из уникального набора
-            // Используем модуль, чтобы не выйти за границы массива
-            snail.originalColor = availableColors[i % availableColors.length];
-            
-            this.snails.push(snail);
-        }
-        
-        // Проверяем и логируем, что все улитки имеют разные цвета
-        const snailColors = this.snails.map(snail => {
-            const color = snail.originalColor;
-            console.log(`Создана улитка: тип=${snail.type}, цвет=${color}, isPlayer=${snail.isPlayer}`);
-            return color;
-        });
-        
-        console.log(`Создано ${this.snails.length} улиток с цветами: ${snailColors.join(', ')}`);
-        return this;
-    }
-    
-    /**
-     * Старт гонки
-     */
-    startRace() {
-        this.isRaceActive = true;
-        this.finishedSnails = [];
-        
-        // Запускаем все улитки
-        for (const snail of this.snails) {
-            snail.reset(); // Сбрасываем улитку в начальное положение
-            snail.start(); // Запускаем движение
-        }
-        
-        // Устанавливаем обработчик для финиша улиток
-        document.addEventListener('snailFinished', this.handleSnailFinish.bind(this));
-        
-        console.log('Гонка началась!');
-    }
-    
-    /**
-     * Обработчик события финиша улитки
-     */
-    handleSnailFinish(event) {
-        const snail = event.detail;
-        
-        // Если улитка уже финишировала, игнорируем
-        if (this.finishedSnails.includes(snail)) return;
-        
-        // Определяем позицию финиша
-        const position = this.finishedSnails.length + 1;
-        
-        // Финишируем улитку
-        snail.finish(position);
-        
-        // Добавляем в список финишировавших
-        this.finishedSnails.push(snail);
-        
-        // Проверяем, закончена ли гонка
-        this.checkRaceFinished();
-    }
-    
-    /**
-     * Проверка завершения гонки
-     */
-    checkRaceFinished() {
-        // Гонка считается завершенной, когда все улитки финишировали
-        // или когда финишировала хотя бы одна улитка и прошло определенное время
-        if (this.finishedSnails.length === this.snails.length) {
-            this.endRace();
-        }
-    }
-    
-    /**
-     * Завершение гонки
-     */
-    endRace() {
-        this.isRaceActive = false;
-        
-        // Останавливаем все улитки
-        for (const snail of this.snails) {
-            snail.stop();
-        }
-        
-        // Удаляем обработчик финиша
-        document.removeEventListener('snailFinished', this.handleSnailFinish);
-        
-        // Объявляем о завершении гонки
-        const event = new CustomEvent('raceFinished', { 
-            detail: { 
-                finishedSnails: this.finishedSnails,
-                allSnails: this.snails,
-                playerSnail: this.playerSnail
-            } 
-        });
-        document.dispatchEvent(event);
-        
-        console.log('Гонка завершена!');
-    }
-    
-    /**
-     * Принудительное завершение гонки (по таймауту)
-     */
-    forceEndRace() {
-        // Определяем улиток, которые еще не финишировали
-        const unfinishedSnails = this.snails.filter(snail => !this.finishedSnails.includes(snail));
-        
-        // Принудительно финишируем их
-        for (const snail of unfinishedSnails) {
-            const position = this.finishedSnails.length + 1;
-            snail.finish(position);
-            this.finishedSnails.push(snail);
-        }
-        
-        this.endRace();
-    }
-    
-    /**
-     * Обновление всех улиток
-     */
-    update(deltaTime) {
-        if (!this.isRaceActive) return;
-        
-        for (const snail of this.snails) {
-            snail.update(deltaTime);
-        }
-    }
-    
-    /**
-     * Отрисовка всех улиток на холсте
-     */
-    draw(ctx) {
-        if (!this.snails || this.snails.length === 0) {
-            console.warn("Нет улиток для отрисовки");
-            return;
-        }
-        
-        for (const snail of this.snails) {
-            if (snail.row !== undefined && snail.col !== undefined) {
-                snail.draw(ctx);
-            }
-        }
-    }
-    
-    /**
-     * Возвращает список финишировавших улиток
-     */
-    getFinishedSnails() {
-        return this.finishedSnails;
     }
 } 
