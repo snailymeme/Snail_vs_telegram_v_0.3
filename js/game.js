@@ -1501,9 +1501,10 @@ class Game {
     
     /**
      * Рандомно распределяет характеристики улиток перед началом гонки
+     * с усиленной рандомизацией для получения более разнообразных результатов
      */
     randomizeSnailAbilities() {
-        console.log("Рандомизируем характеристики улиток...");
+        console.log("НАЧИНАЮ УСИЛЕННУЮ РАНДОМИЗАЦИЮ ХАРАКТЕРИСТИК УЛИТОК...");
         
         // Получаем все типы улиток
         const snailTypes = Object.keys(ASSETS.SNAIL_TYPES).map(key => ASSETS.SNAIL_TYPES[key].TYPE);
@@ -1517,60 +1518,208 @@ class Game {
             }
         }
         
-        // Создаем массив характеристик
-        const characteristics = [];
+        // Функция для случайной модификации числового значения
+        const randomizeValue = (baseValue, minMultiplier = 0.6, maxMultiplier = 1.8) => {
+            const randomMultiplier = minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
+            return baseValue * randomMultiplier;
+        };
+        
+        // Создаем пул всех возможных характеристик из всех типов улиток
+        const allCharacteristics = {};
+        
         for (const key in this.originalSnailCharacteristics) {
-            // Копируем только характеристики, но не тип и имя
-            const snailCharacteristics = {
-                BASE_SPEED: this.originalSnailCharacteristics[key].BASE_SPEED,
-                SPEED_VARIATION: this.originalSnailCharacteristics[key].SPEED_VARIATION,
-                COLOR: this.originalSnailCharacteristics[key].COLOR
-            };
+            const type = this.originalSnailCharacteristics[key].TYPE;
+            const originalChar = this.originalSnailCharacteristics[key];
             
-            // Добавляем специфичные для типа улитки характеристики
-            switch (this.originalSnailCharacteristics[key].TYPE) {
+            // Добавляем базовые характеристики с случайной модификацией
+            if (!allCharacteristics.BASE_SPEED) allCharacteristics.BASE_SPEED = [];
+            if (!allCharacteristics.SPEED_VARIATION) allCharacteristics.SPEED_VARIATION = [];
+            
+            allCharacteristics.BASE_SPEED.push(
+                randomizeValue(originalChar.BASE_SPEED, 0.5, 2.0)
+            );
+            
+            allCharacteristics.SPEED_VARIATION.push(
+                randomizeValue(originalChar.SPEED_VARIATION, 0.5, 2.0)
+            );
+            
+            // Добавляем специфичные характеристики
+            switch (type) {
                 case 'racer':
-                    snailCharacteristics.BOOST_PROBABILITY = this.originalSnailCharacteristics[key].BOOST_PROBABILITY;
-                    snailCharacteristics.BOOST_MULTIPLIER = this.originalSnailCharacteristics[key].BOOST_MULTIPLIER;
+                    if (!allCharacteristics.BOOST_PROBABILITY) allCharacteristics.BOOST_PROBABILITY = [];
+                    if (!allCharacteristics.BOOST_MULTIPLIER) allCharacteristics.BOOST_MULTIPLIER = [];
+                    
+                    allCharacteristics.BOOST_PROBABILITY.push(
+                        randomizeValue(originalChar.BOOST_PROBABILITY, 0.3, 2.5)
+                    );
+                    allCharacteristics.BOOST_MULTIPLIER.push(
+                        randomizeValue(originalChar.BOOST_MULTIPLIER, 0.5, 2.2)
+                    );
                     break;
+                    
                 case 'explorer':
-                    snailCharacteristics.EXPLORATION_RATE = this.originalSnailCharacteristics[key].EXPLORATION_RATE;
+                    if (!allCharacteristics.EXPLORATION_RATE) allCharacteristics.EXPLORATION_RATE = [];
+                    
+                    allCharacteristics.EXPLORATION_RATE.push(
+                        randomizeValue(originalChar.EXPLORATION_RATE, 0.3, 2.5)
+                    );
                     break;
+                    
                 case 'snake':
-                    snailCharacteristics.ZIGZAG_PROBABILITY = this.originalSnailCharacteristics[key].ZIGZAG_PROBABILITY;
+                    if (!allCharacteristics.ZIGZAG_PROBABILITY) allCharacteristics.ZIGZAG_PROBABILITY = [];
+                    
+                    allCharacteristics.ZIGZAG_PROBABILITY.push(
+                        randomizeValue(originalChar.ZIGZAG_PROBABILITY, 0.3, 2.5)
+                    );
                     break;
+                    
                 case 'stubborn':
-                    snailCharacteristics.FORWARD_PROBABILITY = this.originalSnailCharacteristics[key].FORWARD_PROBABILITY;
+                    if (!allCharacteristics.FORWARD_PROBABILITY) allCharacteristics.FORWARD_PROBABILITY = [];
+                    
+                    allCharacteristics.FORWARD_PROBABILITY.push(
+                        randomizeValue(originalChar.FORWARD_PROBABILITY, 0.3, 1.5)
+                    );
                     break;
+                    
                 case 'deadender':
-                    snailCharacteristics.RANDOM_TURN_PROBABILITY = this.originalSnailCharacteristics[key].RANDOM_TURN_PROBABILITY;
+                    if (!allCharacteristics.RANDOM_TURN_PROBABILITY) allCharacteristics.RANDOM_TURN_PROBABILITY = [];
+                    
+                    allCharacteristics.RANDOM_TURN_PROBABILITY.push(
+                        randomizeValue(originalChar.RANDOM_TURN_PROBABILITY, 0.3, 2.5)
+                    );
                     break;
             }
-            
-            characteristics.push(snailCharacteristics);
         }
         
-        // Перемешиваем характеристики
-        this.shuffleArray(characteristics);
+        // Перемешиваем характеристики в каждом пуле
+        for (const key in allCharacteristics) {
+            this.shuffleArray(allCharacteristics[key]);
+        }
         
-        // Применяем перемешанные характеристики к улиткам, сохраняя их тип и имя
-        let i = 0;
+        // Применяем случайно выбранные характеристики ко всем улиткам
+        // с шансом смешивания характеристик разных типов
         for (const key in ASSETS.SNAIL_TYPES) {
-            ASSETS.SNAIL_TYPES[key] = {
-                ...ASSETS.SNAIL_TYPES[key],
-                ...characteristics[i]
-            };
+            const originalType = this.originalSnailCharacteristics[key].TYPE;
+            
+            // Базовые характеристики (общие для всех улиток)
+            const baseSpeedIndex = Math.floor(Math.random() * allCharacteristics.BASE_SPEED.length);
+            const speedVarIndex = Math.floor(Math.random() * allCharacteristics.SPEED_VARIATION.length);
+            
+            ASSETS.SNAIL_TYPES[key].BASE_SPEED = allCharacteristics.BASE_SPEED[baseSpeedIndex];
+            ASSETS.SNAIL_TYPES[key].SPEED_VARIATION = allCharacteristics.SPEED_VARIATION[speedVarIndex];
+            
+            // Смешиваем специальные характеристики
+            // Шанс 60%, что улитка получит характеристику не своего типа
+            if (Math.random() < 0.6) {
+                // Применяем характеристики случайного типа
+                const randomType = snailTypes[Math.floor(Math.random() * snailTypes.length)];
+                
+                switch (randomType) {
+                    case 'racer':
+                        if (allCharacteristics.BOOST_PROBABILITY && allCharacteristics.BOOST_PROBABILITY.length > 0) {
+                            const boostProbIndex = Math.floor(Math.random() * allCharacteristics.BOOST_PROBABILITY.length);
+                            const boostMultIndex = Math.floor(Math.random() * allCharacteristics.BOOST_MULTIPLIER.length);
+                            
+                            ASSETS.SNAIL_TYPES[key].BOOST_PROBABILITY = allCharacteristics.BOOST_PROBABILITY[boostProbIndex];
+                            ASSETS.SNAIL_TYPES[key].BOOST_MULTIPLIER = allCharacteristics.BOOST_MULTIPLIER[boostMultIndex];
+                        }
+                        break;
+                        
+                    case 'explorer':
+                        if (allCharacteristics.EXPLORATION_RATE && allCharacteristics.EXPLORATION_RATE.length > 0) {
+                            const explorationIndex = Math.floor(Math.random() * allCharacteristics.EXPLORATION_RATE.length);
+                            ASSETS.SNAIL_TYPES[key].EXPLORATION_RATE = allCharacteristics.EXPLORATION_RATE[explorationIndex];
+                        }
+                        break;
+                        
+                    case 'snake':
+                        if (allCharacteristics.ZIGZAG_PROBABILITY && allCharacteristics.ZIGZAG_PROBABILITY.length > 0) {
+                            const zigzagIndex = Math.floor(Math.random() * allCharacteristics.ZIGZAG_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].ZIGZAG_PROBABILITY = allCharacteristics.ZIGZAG_PROBABILITY[zigzagIndex];
+                        }
+                        break;
+                        
+                    case 'stubborn':
+                        if (allCharacteristics.FORWARD_PROBABILITY && allCharacteristics.FORWARD_PROBABILITY.length > 0) {
+                            const forwardIndex = Math.floor(Math.random() * allCharacteristics.FORWARD_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].FORWARD_PROBABILITY = allCharacteristics.FORWARD_PROBABILITY[forwardIndex];
+                        }
+                        break;
+                        
+                    case 'deadender':
+                        if (allCharacteristics.RANDOM_TURN_PROBABILITY && allCharacteristics.RANDOM_TURN_PROBABILITY.length > 0) {
+                            const randomTurnIndex = Math.floor(Math.random() * allCharacteristics.RANDOM_TURN_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].RANDOM_TURN_PROBABILITY = allCharacteristics.RANDOM_TURN_PROBABILITY[randomTurnIndex];
+                        }
+                        break;
+                }
+            } else {
+                // Применяем характеристики своего типа, но случайные
+                switch (originalType) {
+                    case 'racer':
+                        if (allCharacteristics.BOOST_PROBABILITY && allCharacteristics.BOOST_PROBABILITY.length > 0) {
+                            const boostProbIndex = Math.floor(Math.random() * allCharacteristics.BOOST_PROBABILITY.length);
+                            const boostMultIndex = Math.floor(Math.random() * allCharacteristics.BOOST_MULTIPLIER.length);
+                            
+                            ASSETS.SNAIL_TYPES[key].BOOST_PROBABILITY = allCharacteristics.BOOST_PROBABILITY[boostProbIndex];
+                            ASSETS.SNAIL_TYPES[key].BOOST_MULTIPLIER = allCharacteristics.BOOST_MULTIPLIER[boostMultIndex];
+                        }
+                        break;
+                        
+                    case 'explorer':
+                        if (allCharacteristics.EXPLORATION_RATE && allCharacteristics.EXPLORATION_RATE.length > 0) {
+                            const explorationIndex = Math.floor(Math.random() * allCharacteristics.EXPLORATION_RATE.length);
+                            ASSETS.SNAIL_TYPES[key].EXPLORATION_RATE = allCharacteristics.EXPLORATION_RATE[explorationIndex];
+                        }
+                        break;
+                        
+                    case 'snake':
+                        if (allCharacteristics.ZIGZAG_PROBABILITY && allCharacteristics.ZIGZAG_PROBABILITY.length > 0) {
+                            const zigzagIndex = Math.floor(Math.random() * allCharacteristics.ZIGZAG_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].ZIGZAG_PROBABILITY = allCharacteristics.ZIGZAG_PROBABILITY[zigzagIndex];
+                        }
+                        break;
+                        
+                    case 'stubborn':
+                        if (allCharacteristics.FORWARD_PROBABILITY && allCharacteristics.FORWARD_PROBABILITY.length > 0) {
+                            const forwardIndex = Math.floor(Math.random() * allCharacteristics.FORWARD_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].FORWARD_PROBABILITY = allCharacteristics.FORWARD_PROBABILITY[forwardIndex];
+                        }
+                        break;
+                        
+                    case 'deadender':
+                        if (allCharacteristics.RANDOM_TURN_PROBABILITY && allCharacteristics.RANDOM_TURN_PROBABILITY.length > 0) {
+                            const randomTurnIndex = Math.floor(Math.random() * allCharacteristics.RANDOM_TURN_PROBABILITY.length);
+                            ASSETS.SNAIL_TYPES[key].RANDOM_TURN_PROBABILITY = allCharacteristics.RANDOM_TURN_PROBABILITY[randomTurnIndex];
+                        }
+                        break;
+                }
+            }
             
             // Сохраняем тип и имя оригинальной улитки
             ASSETS.SNAIL_TYPES[key].TYPE = this.originalSnailCharacteristics[key].TYPE;
             ASSETS.SNAIL_TYPES[key].NAME = this.originalSnailCharacteristics[key].NAME;
             ASSETS.SNAIL_TYPES[key].DESCRIPTION = this.originalSnailCharacteristics[key].DESCRIPTION;
-            
-            i++;
         }
         
         // Выводим в консоль новые характеристики для отладки
-        console.log("Новые характеристики улиток:", ASSETS.SNAIL_TYPES);
+        console.log("НОВЫЕ УСИЛЕННО РАНДОМИЗИРОВАННЫЕ ХАРАКТЕРИСТИКИ УЛИТОК:", 
+            Object.entries(ASSETS.SNAIL_TYPES).map(([key, value]) => ({
+                type: value.TYPE,
+                baseSpeed: value.BASE_SPEED.toFixed(2),
+                speedVar: value.SPEED_VARIATION.toFixed(2),
+                special: (() => {
+                    switch(value.TYPE) {
+                        case 'racer': return `Boost: ${value.BOOST_PROBABILITY.toFixed(2)}, Mult: ${value.BOOST_MULTIPLIER.toFixed(2)}`;
+                        case 'explorer': return `Expl: ${value.EXPLORATION_RATE.toFixed(2)}`;
+                        case 'snake': return `Zigzag: ${value.ZIGZAG_PROBABILITY.toFixed(2)}`;
+                        case 'stubborn': return `Forward: ${value.FORWARD_PROBABILITY.toFixed(2)}`;
+                        case 'deadender': return `Random: ${value.RANDOM_TURN_PROBABILITY.toFixed(2)}`;
+                        default: return 'N/A';
+                    }
+                })()
+            }))
+        );
     }
     
     /**
