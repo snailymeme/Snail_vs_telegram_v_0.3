@@ -23,6 +23,9 @@ class Snail {
         this.originalColor = null;
         this.isPlayer = false; // Флаг, указывающий, является ли улитка игроком
         
+        // Поведение улитки (по умолчанию соответствует типу)
+        this.behavior = null;
+        
         // Общие настройки для всех улиток
         this.cellSize = ASSETS.CELL_SIZE;
         this.isMoving = false;
@@ -347,8 +350,12 @@ class Snail {
         // Если улитка финишировала, не меняем путь
         if (this.hasFinished) return;
         
-        // Генерируем путь с учетом типа улитки
-        switch (this.type) {
+        // Определяем, какое поведение использовать - либо явно заданное behavior, либо тип
+        const behaviorType = this.behavior || this.type;
+        console.log(`Генерация пути для улитки типа ${this.type} с поведением ${behaviorType}`);
+        
+        // Генерируем путь с учетом поведения улитки
+        switch (behaviorType) {
             case 'racer':
                 this.generateRacerPath();
                 break;

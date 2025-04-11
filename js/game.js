@@ -604,7 +604,7 @@ class Game {
                 this.selectedSnailType = selectedOption.dataset.snailType;
                 this.selectedSnailColor = selectedOption.dataset.snailColor;
                 this.selectedSnailBehavior = selectedOption.dataset.snailBehavior;
-                console.log(`Выбрана улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor}`);
+                console.log(`Выбрана улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor} и поведением ${this.selectedSnailBehavior}`);
             } else {
                 // Если ничего не выбрано, берем случайную улитку
                 console.log('Не выбрана улитка, выбираем случайную');
@@ -613,16 +613,17 @@ class Game {
                 this.selectedSnailType = randomOption.dataset.snailType;
                 this.selectedSnailColor = randomOption.dataset.snailColor;
                 this.selectedSnailBehavior = randomOption.dataset.snailBehavior;
-                console.log(`Выбрана случайная улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor}`);
+                console.log(`Выбрана случайная улитка типа ${this.selectedSnailType} с цветом ${this.selectedSnailColor} и поведением ${this.selectedSnailBehavior}`);
             }
         }
         
         // НОВОЕ: Сохраняем данные о выбранной улитке перед запуском гонки
         if (this.selectedSnailType && this.selectedSnailColor) {
-            console.log(`Запоминаем данные о выбранной улитке: тип=${this.selectedSnailType}, цвет=${this.selectedSnailColor}`);
+            console.log(`Запоминаем данные о выбранной улитке: тип=${this.selectedSnailType}, цвет=${this.selectedSnailColor}, поведение=${this.selectedSnailBehavior}`);
             
             // Сохраняем в глобальной области для доступа в других местах
             window.PLAYER_SNAIL_COLOR = this.selectedSnailColor;
+            window.PLAYER_SNAIL_BEHAVIOR = this.selectedSnailBehavior;
             
             // Обновляем карту цветов улиток
             if (window.SNAIL_COLORS_MAP) {
@@ -648,6 +649,7 @@ class Game {
                 // Обновляем существующую запись
                 window.RANDOMIZED_SNAILS[existingSnailIndex].color = this.selectedSnailColor;
                 window.RANDOMIZED_SNAILS[existingSnailIndex].originalColor = this.selectedSnailColor;
+                window.RANDOMIZED_SNAILS[existingSnailIndex].behavior = this.selectedSnailBehavior;
                 window.RANDOMIZED_SNAILS[existingSnailIndex].isPlayer = true;
             } else {
                 // Добавляем новую запись
@@ -655,6 +657,7 @@ class Game {
                     type: this.selectedSnailType,
                     color: this.selectedSnailColor,
                     originalColor: this.selectedSnailColor,
+                    behavior: this.selectedSnailBehavior,
                     isPlayer: true
                 });
             }
@@ -702,20 +705,31 @@ class Game {
         // Создаем менеджер улиток
         this.snailManager = new SnailManager(this.selectedSnailType, this.maze);
         
-        // НОВОЕ: Если у нас есть информация о цвете, передаем ее в менеджер улиток
-        if (this.selectedSnailColor) {
-            console.log(`Передаем цвет улитки в менеджер: ${this.selectedSnailColor}`);
+        // НОВОЕ: Если у нас есть информация о цвете или поведении, передаем их в менеджер улиток
+        if (this.selectedSnailColor || this.selectedSnailBehavior) {
+            console.log(`Передаем свойства улитки в менеджер: цвет=${this.selectedSnailColor}, поведение=${this.selectedSnailBehavior}`);
             
-            // Проверяем наличие метода перед вызовом
-            if (typeof this.snailManager.setPlayerSnailColor === 'function') {
+            // Проверяем наличие нового метода перед вызовом
+            if (typeof this.snailManager.setPlayerSnailProperties === 'function') {
+                this.snailManager.setPlayerSnailProperties(this.selectedSnailColor, this.selectedSnailBehavior);
+            } 
+            // Для обратной совместимости
+            else if (typeof this.snailManager.setPlayerSnailColor === 'function') {
                 this.snailManager.setPlayerSnailColor(this.selectedSnailColor);
-            } else {
-                console.warn('Метод setPlayerSnailColor не найден в snailManager. Возможно, кэш браузера не обновлен.');
+                console.warn('Метод setPlayerSnailProperties не найден, используется устаревший метод setPlayerSnailColor');
+            } 
+            else {
+                console.warn('Методы установки свойств улитки не найдены в snailManager. Возможно, кэш браузера не обновлен.');
                 
-                // Альтернативное решение: устанавливаем цвет напрямую в улитку игрока
+                // Альтернативное решение: устанавливаем свойства напрямую в улитку игрока
                 if (this.snailManager.playerSnail) {
-                    console.log('Устанавливаем цвет напрямую для улитки игрока');
-                    this.snailManager.playerSnail.originalColor = this.selectedSnailColor;
+                    console.log('Устанавливаем свойства напрямую для улитки игрока');
+                    if (this.selectedSnailColor) {
+                        this.snailManager.playerSnail.originalColor = this.selectedSnailColor;
+                    }
+                    if (this.selectedSnailBehavior) {
+                        this.snailManager.playerSnail.behavior = this.selectedSnailBehavior.toLowerCase();
+                    }
                 }
             }
         }
@@ -1695,12 +1709,22 @@ class Game {
             option.dataset.snailColor = colorName;
             option.dataset.snailBehavior = behaviorData.behavior;
             
-            // Обновляем визуальное представление если нужно
-            // const nameElement = option.querySelector('span');
-            // if (nameElement) nameElement.textContent = colorName;
+            // Обновляем визуальное представление улиток на экране выбора
+            const nameElement = option.querySelector('span');
+            if (nameElement) nameElement.textContent = colorName;
             
-            // const imgElement = option.querySelector('img');
-            // if (imgElement) imgElement.src = colorData.img;
+            const imgElement = option.querySelector('img');
+            if (imgElement) imgElement.src = colorData.img;
+            
+            // Добавляем информацию о поведении и типе для отображения
+            const infoElement = option.querySelector('.snail-info');
+            if (infoElement) {
+                const titleElement = infoElement.querySelector('.snail-title');
+                const behaviorElement = infoElement.querySelector('.snail-behavior');
+                
+                if (titleElement) titleElement.textContent = colorName;
+                if (behaviorElement) behaviorElement.textContent = `${behaviorData.behavior} Style`;
+            }
             
             // Сбрасываем выделение
             option.classList.remove('selected');
@@ -1742,6 +1766,11 @@ class Game {
         });
         
         console.log("Инициализирована глобальная карта цветов:", window.SNAIL_TYPE_TO_COLOR);
+        
+        // Сбрасываем любой предыдущий выбор улитки
+        this.selectedSnailType = null;
+        this.selectedSnailColor = null;
+        this.selectedSnailBehavior = null;
     }
     
     /**

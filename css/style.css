@@ -3,6 +3,7 @@
     --secondary-color: #ffb300;
     --background-color: #f0f2f5;
     --text-color: #333;
+    --text-muted: #666;
     --button-color: #5e35b1;
     --button-hover: #4527a0;
     --button-text: #fff;
@@ -114,7 +115,7 @@ h3 {
     background-color: var(--card-bg);
     border-radius: 12px;
     padding: 1rem;
-    width: 140px;
+    width: 160px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -122,6 +123,7 @@ h3 {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     border: 2px solid transparent;
+    overflow: hidden;
 }
 
 .snail-option:hover {
@@ -139,20 +141,41 @@ h3 {
     height: 80px;
     object-fit: contain;
     margin-bottom: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.snail-option:hover img {
+    transform: scale(1.1);
 }
 
 .snail-info {
     text-align: center;
+    width: 100%;
 }
 
-.snail-info h3 {
+.snail-info h3.snail-title {
     font-size: 1rem;
-    margin-bottom: 0.2rem;
+    margin: 0.2rem 0;
+    color: var(--text-color);
+    font-weight: bold;
 }
 
-.snail-info p {
+.snail-info p.snail-behavior {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-muted);
+    margin: 0.1rem 0;
+    font-style: italic;
+}
+
+.snail-info p.snail-description {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    display: none;
+}
+
+.snail-option:hover .snail-description {
+    display: block;
 }
 
 /* Контейнер для ставок */
@@ -571,6 +594,10 @@ input:focus {
 .dark-theme {
     --background-color: #242f3d;
     --text-color: #ffffff;
+    --text-muted: #aaaaaa;
+    --card-bg: #36404a;
+    --border-color: #4d5a68;
+    --shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .dark-theme .snail-option {

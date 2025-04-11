@@ -38,20 +38,34 @@ class SnailManager {
         this.playerSnail = new Snail(playerSnailType, startRow, startCol, this.maze);
         this.playerSnail.isPlayer = true;
         
-        // НОВОЕ: ищем цвет улитки игрока из нескольких источников
+        // НОВОЕ: ищем цвет и поведение улитки игрока из нескольких источников
         let playerSnailColor = null;
+        let playerSnailBehavior = null;
         
-        // 1. Проверяем глобальную переменную PLAYER_SNAIL_COLOR
+        // 1. Проверяем глобальные переменные
         if (window.PLAYER_SNAIL_COLOR) {
             playerSnailColor = window.PLAYER_SNAIL_COLOR;
             console.log(`Использую цвет улитки из глобальной переменной: ${playerSnailColor}`);
         } 
+        
+        if (window.PLAYER_SNAIL_BEHAVIOR) {
+            playerSnailBehavior = window.PLAYER_SNAIL_BEHAVIOR;
+            console.log(`Использую поведение улитки из глобальной переменной: ${playerSnailBehavior}`);
+        }
+        
         // 2. Проверяем данные рандомизации
-        else if (window.RANDOMIZED_SNAILS) {
+        if (window.RANDOMIZED_SNAILS && (!playerSnailColor || !playerSnailBehavior)) {
             const playerSnailData = window.RANDOMIZED_SNAILS.find(s => s.type === playerSnailType);
             if (playerSnailData) {
-                playerSnailColor = playerSnailData.originalColor || playerSnailData.color;
-                console.log(`Найден цвет улитки в RANDOMIZED_SNAILS: ${playerSnailColor}`);
+                if (!playerSnailColor) {
+                    playerSnailColor = playerSnailData.originalColor || playerSnailData.color;
+                    console.log(`Найден цвет улитки в RANDOMIZED_SNAILS: ${playerSnailColor}`);
+                }
+                
+                if (!playerSnailBehavior) {
+                    playerSnailBehavior = playerSnailData.behavior;
+                    console.log(`Найдено поведение улитки в RANDOMIZED_SNAILS: ${playerSnailBehavior}`);
+                }
             }
         }
         
@@ -61,6 +75,14 @@ class SnailManager {
             this.playerSnail.originalColor = playerSnailColor;
         } else {
             console.warn(`Не удалось найти цвет для улитки игрока типа ${playerSnailType}`);
+        }
+        
+        // Если нашли поведение, устанавливаем его для улитки игрока
+        if (playerSnailBehavior) {
+            console.log(`Устанавливаю поведение ${playerSnailBehavior} для улитки игрока типа ${playerSnailType}`);
+            this.playerSnail.behavior = playerSnailBehavior.toLowerCase();
+        } else {
+            console.warn(`Не удалось найти поведение для улитки игрока типа ${playerSnailType}`);
         }
         
         this.snails.push(this.playerSnail);
@@ -709,28 +731,45 @@ class SnailManager {
     }
     
     /**
-     * Устанавливает цвет для улитки игрока
+     * Устанавливает свойства для улитки игрока
+     * @param {string} color - Цвет улитки игрока
+     * @param {string} behavior - Поведение улитки игрока
+     */
+    setPlayerSnailProperties(color, behavior) {
+        console.log(`Устанавливаю свойства улитки игрока: цвет=${color}, поведение=${behavior}`);
+        
+        if (this.playerSnail) {
+            if (color) {
+                this.playerSnail.originalColor = color;
+                
+                // При необходимости обновляем внешний вид улитки
+                if (this.playerSnail.element) {
+                    const snailImage = this.playerSnail.element.querySelector('img');
+                    if (snailImage) {
+                        const colorLower = color.toLowerCase();
+                        snailImage.src = `images/${colorLower}_snail.png`;
+                        console.log(`Изображение улитки игрока обновлено на: ${colorLower}`);
+                    }
+                }
+            }
+            
+            if (behavior) {
+                this.playerSnail.behavior = behavior.toLowerCase();
+                console.log(`Установлено поведение улитки игрока: ${behavior}`);
+            }
+        } else {
+            console.warn('Улитка игрока не создана, свойства будут установлены при её создании');
+            // Сохраняем для последующего использования
+            this.pendingPlayerColor = color;
+            this.pendingPlayerBehavior = behavior;
+        }
+    }
+    
+    /**
+     * Устанавливает цвет для улитки игрока (устаревший метод, для обратной совместимости)
      * @param {string} color - Цвет улитки игрока
      */
     setPlayerSnailColor(color) {
-        console.log(`Устанавливаю цвет улитки игрока: ${color}`);
-        
-        if (this.playerSnail) {
-            this.playerSnail.originalColor = color;
-            
-            // При необходимости обновляем внешний вид улитки
-            if (this.playerSnail.element) {
-                const snailImage = this.playerSnail.element.querySelector('img');
-                if (snailImage) {
-                    const colorLower = color.toLowerCase();
-                    snailImage.src = `images/${colorLower}_snail.png`;
-                    console.log(`Изображение улитки игрока обновлено на: ${colorLower}`);
-                }
-            }
-        } else {
-            console.warn('Улитка игрока не создана, цвет будет установлен при её создании');
-            // Сохраняем цвет для последующего использования
-            this.pendingPlayerColor = color;
-        }
+        this.setPlayerSnailProperties(color, null);
     }
 } 
